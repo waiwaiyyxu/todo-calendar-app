@@ -1185,7 +1185,8 @@
 
         function deleteCurrentTask() {
             if (!editingIssue) return;
-            if (!confirm('确定删除这个任务吗？')) return;
+            const isLocalFile = window.location.protocol === 'file:';
+            if (!isLocalFile && !confirm('确定删除这个任务吗？')) return;
             doDeleteTask();
         }
         async function doDeleteTask() {
