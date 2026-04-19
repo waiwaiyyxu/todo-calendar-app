@@ -1189,19 +1189,20 @@
             }
         }
 
-        async function deleteCurrentTask() {
+        function deleteCurrentTask() {
             if (!editingIssue) return;
             if (!confirm('确定删除这个任务吗？')) return;
+            doDeleteTask();
+        }
+        async function doDeleteTask() {
             try {
-                const b = editingIssue._body;
-                b.deleted = true;
+                const b = { ...editingIssue._body, deleted: true };
                 await fetch(`${API_URL()}/${editingIssue.number}`, {
                     method: 'PATCH',
                     headers: headers(),
                     body: JSON.stringify({ state: 'closed', body: JSON.stringify(b) })
                 });
                 closeTaskModal();
-                // 本地即时移除，避免 GitHub API 写入延迟
                 allTodos = allTodos.filter(t => t.number !== editingIssue.number);
                 renderCalendar();
                 renderTodayBanner();
