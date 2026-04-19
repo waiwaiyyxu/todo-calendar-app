@@ -1,0 +1,1698 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>博远 Todo Calendar</title>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #f5f6f7;
+            color: #333;
+            padding: 16px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        .header {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        .header h1 { font-size: 20px; color: #1a1a1a; }
+        .header-controls {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 8px 14px;
+            border: none;
+            border-radius: 6px;
+            background: #1677ff;
+            color: #fff;
+            font-size: 14px;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        button:hover { opacity: 0.9; }
+        button.secondary { background: #fff; color: #333; border: 1px solid #d9d9d9; }
+        button.warning { background: #faad14; }
+        button.danger { background: #ff4d4f; }
+        .month-nav {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        .month-nav h2 { font-size: 18px; min-width: 140px; text-align: center; }
+        .today-banner {
+            background: #fff;
+            border: 1px solid #d9d9d9;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin-bottom: 14px;
+        }
+        .today-banner h4 {
+            font-size: 14px;
+            color: #1677ff;
+            margin-bottom: 8px;
+        }
+        .today-banner ul {
+            list-style: none;
+            font-size: 13px;
+            line-height: 1.7;
+        }
+        .today-banner li {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .today-banner .badge {
+            font-size: 10px;
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-weight: 600;
+        }
+        .badge-lp { background: #e6f7ff; color: #0050b3; }
+        .badge-report { background: #fff2e8; color: #ad4e00; }
+        .badge-life { background: #f6ffed; color: #389e0d; }
+        .badge-other { background: #f5f5f5; color: #666; }
+        .calendar {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 6px;
+        }
+        .weekday {
+            text-align: center;
+            font-size: 12px;
+            color: #888;
+            padding: 6px 0;
+            font-weight: 600;
+        }
+        .day-cell {
+            background: #fff;
+            border: 1px solid #e8e8e8;
+            border-radius: 8px;
+            min-height: 120px;
+            max-height: 260px;
+            padding: 6px;
+            display: flex;
+            flex-direction: column;
+            cursor: pointer;
+            transition: box-shadow 0.2s;
+        }
+        .day-cell:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .day-cell.other-month { background: #fafafa; color: #bbb; }
+        .day-cell.today { border-color: #1677ff; background: #f0f7ff; }
+        .day-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+        .day-number {
+            font-size: 12px;
+            font-weight: 600;
+            color: #555;
+        }
+        .day-cell.today .day-number { color: #1677ff; }
+        .day-count {
+            font-size: 10px;
+            color: #999;
+            background: #f5f5f5;
+            padding: 1px 4px;
+            border-radius: 3px;
+        }
+        .todos-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            overflow-y: auto;
+            padding-right: 2px;
+        }
+        .todos-container::-webkit-scrollbar { width: 4px; }
+        .todos-container::-webkit-scrollbar-thumb {
+            background: #d9d9d9;
+            border-radius: 2px;
+        }
+        .todo-card {
+            padding: 4px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+            line-height: 1.35;
+            display: flex;
+            align-items: flex-start;
+            gap: 4px;
+            cursor: pointer;
+            word-break: break-word;
+        }
+        .todo-card.open {
+            background: #fff3cd;
+            border-left: 3px solid #ffc107;
+            color: #5c4b00;
+        }
+        .todo-card.closed {
+            background: #e8e8e8;
+            border-left: 3px solid #9e9e9e;
+            color: #888;
+            text-decoration: line-through;
+        }
+        .todo-card .tag-icon {
+            flex-shrink: 0;
+            font-size: 9px;
+            padding: 0 3px;
+            border-radius: 2px;
+            margin-top: 1px;
+            font-weight: 600;
+        }
+        .tag-lp-icon { background: #bae7ff; color: #0050b3; }
+        .tag-report-icon { background: #ffd8bf; color: #ad4e00; }
+        .tag-life-icon { background: #d9f7be; color: #237804; }
+        .tag-other-icon { background: #f5f5f5; color: #666; }
+        .todo-card .stars {
+            flex-shrink: 0;
+            font-size: 10px;
+            color: #ff9800;
+        }
+        .todo-card .text { flex: 1; }
+        .todo-card .bell {
+            flex-shrink: 0;
+            font-size: 10px;
+            color: #ff4d4f;
+        }
+        .add-hint {
+            font-size: 11px;
+            color: #bbb;
+            text-align: center;
+            margin-top: auto;
+            padding-top: 4px;
+        }
+        .overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            padding: 16px;
+        }
+        .overlay.active { display: flex; }
+        .modal {
+            background: #fff;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 460px;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        .modal h3 { margin-bottom: 16px; font-size: 18px; }
+        .form-group { margin-bottom: 14px; }
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 6px;
+        }
+        .form-group input[type="text"],
+        .form-group input[type="password"],
+        .form-group input[type="datetime-local"],
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+        .form-group textarea { min-height: 80px; resize: vertical; }
+        .form-group input[type="checkbox"] {
+            width: 18px; height: 18px; cursor: pointer;
+        }
+        .checkbox-row {
+            display: flex; align-items: center; gap: 8px;
+        }
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 8px;
+        }
+        .report-text, .stat-text {
+            width: 100%;
+            min-height: 200px;
+            font-family: inherit;
+            font-size: 14px;
+            padding: 12px;
+            border: 1px solid #d9d9d9;
+            border-radius: 6px;
+            resize: vertical;
+            line-height: 1.6;
+        }
+        .stat-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            margin-top: 8px;
+        }
+        .stat-table th, .stat-table td {
+            border: 1px solid #e8e8e8;
+            padding: 8px;
+            text-align: left;
+        }
+        .stat-table th {
+            background: #f5f5f5;
+            font-weight: 600;
+        }
+        .loading {
+            text-align: center;
+            color: #888;
+            padding: 40px;
+        }
+        .config-notice {
+            background: #fff2f0;
+            border: 1px solid #ffccc7;
+            color: #cf1322;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            font-size: 13px;
+        }
+        .security-tip {
+            background: #f6ffed;
+            border: 1px solid #b7eb8f;
+            color: #389e0d;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            margin-bottom: 14px;
+            line-height: 1.5;
+        }
+        .token-mask {
+            font-family: monospace;
+            letter-spacing: 1px;
+        }
+        @media (max-width: 768px) {
+            .calendar { gap: 4px; }
+            .day-cell { min-height: 100px; max-height: 220px; padding: 4px; border-radius: 6px; }
+            .day-number { font-size: 11px; }
+            .todo-card { font-size: 11px; padding: 3px 4px; }
+            .todo-card .stars, .todo-card .tag-icon, .todo-card .bell { font-size: 9px; }
+            .today-banner { padding: 10px 12px; }
+            .today-banner h4 { font-size: 13px; }
+            .today-banner ul { font-size: 12px; }
+            .header h1 { font-size: 18px; }
+            .stat-table th, .stat-table td { padding: 6px; font-size: 12px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📅 博远 Todo Calendar</h1>
+        <div class="header-controls">
+            <button class="secondary" onclick="openConfigModal()">⚙️ 配置</button>
+            <button class="secondary" onclick="openImportModal()">📥 导入 Excel</button>
+            <button class="secondary" onclick="openStatModal()">📊 统计查询</button>
+            <button class="secondary" onclick="openExportModal()">📤 导出 Excel</button>
+            <button class="warning" onclick="generateReport()">📋 生成周报</button>
+            <button class="warning" onclick="generateMonthlyReport()">📊 生成月报</button>
+            <button class="secondary" onclick="toggleDebugPanel()" title="显示/隐藏调试信息">🔍</button>
+            <button class="warning" onclick="openBulkDoneModal()">✅ 批量完成</button>
+            <button class="danger" onclick="openBulkDeleteModal()">🗑️ 批量清理</button>
+            <button onclick="location.reload()">🔄 刷新</button>
+        </div>
+    </div>
+
+    <!-- 今日待办提醒横幅 -->
+    <div id="today-banner" class="today-banner" style="display:none">
+        <h4>📍 今日待办（<span id="today-count">0</span>）</h4>
+        <ul id="today-list"></ul>
+    </div>
+
+    <div id="config-notice" class="config-notice" style="display:none">
+        ⚠️ 首次使用，请点击右上角 <strong>"配置"</strong> 输入你的 GitHub 信息。
+    </div>
+
+    <!-- 调试信息面板（默认隐藏） -->
+    <div id="debug-panel" style="display:none;background:#f0f7ff;border:1px solid #91d5ff;padding:10px;border-radius:6px;margin-bottom:12px;font-size:12px;line-height:1.6;white-space:pre-wrap;font-family:monospace"></div>
+
+    <div class="month-nav">
+        <button class="secondary" onclick="changeMonth(-1)">‹ 上月</button>
+        <h2 id="month-title">2026年4月</h2>
+        <button class="secondary" onclick="changeMonth(1)">下月 ›</button>
+    </div>
+    <div style="font-size:12px;color:#888;margin-bottom:8px;text-align:center" id="loaded-count"></div>
+
+    <div id="calendar-container">
+        <div class="loading">正在初始化...</div>
+    </div>
+
+    <!-- 配置弹窗 -->
+    <div class="overlay" id="config-overlay" onclick="if(event.target===this)closeConfigModal()">
+        <div class="modal">
+            <h3>GitHub 配置</h3>
+            <div class="security-tip">
+                🔒 <strong>安全提示</strong>：你的 Token 只会保存在当前设备的浏览器中，不会上传到任何服务器或 GitHub 仓库。
+            </div>
+            <div class="form-group">
+                <label>GitHub 用户名</label>
+                <input type="text" id="cfg-user" placeholder="例如：ying-boyuan">
+            </div>
+            <div class="form-group">
+                <label>仓库名</label>
+                <input type="text" id="cfg-repo" placeholder="例如：my-todo-calendar">
+            </div>
+            <div class="form-group">
+                <label>Personal Access Token</label>
+                <input type="password" id="cfg-token" class="token-mask" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+            </div>
+            <div class="modal-actions">
+                <button class="danger" onclick="clearConfig()">清除本地配置</button>
+                <button class="secondary" onclick="closeConfigModal()">取消</button>
+                <button onclick="saveConfig()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 任务编辑/添加弹窗 -->
+    <div class="overlay" id="task-overlay" onclick="if(event.target===this)closeTaskModal()">
+        <div class="modal">
+            <h3 id="task-modal-title">添加任务</h3>
+            <div class="form-group">
+                <label>日期</label>
+                <input type="text" id="task-date" readonly>
+            </div>
+            <div class="form-group">
+                <label>任务内容</label>
+                <textarea id="task-text" placeholder="请输入待办事项..."></textarea>
+            </div>
+            <div class="form-group">
+                <label>标签</label>
+                <select id="task-tag" onchange="onTagChange()">
+                    <option value="LP">LP</option>
+                    <option value="填报">填报</option>
+                    <option value="生活">生活</option>
+                    <option value="其他">其他</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>优先级</label>
+                <select id="task-priority">
+                    <option value="3">★★★ 高优先级</option>
+                    <option value="2">★★ 中优先级</option>
+                    <option value="1" selected>★ 低优先级</option>
+                </select>
+            </div>
+            <div class="form-group" id="category-group">
+                <label>分类（周报用）</label>
+                <select id="task-category">
+                    <option value="LP相关" selected>LP相关</option>
+                    <option value="其他">其他</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>提醒时间（可选）</label>
+                <input type="datetime-local" id="task-reminder">
+            </div>
+            <div class="form-group">
+                <label>备注</label>
+                <input type="text" id="task-note" placeholder="可选：补充说明、ddl等">
+            </div>
+            <div class="form-group checkbox-row" id="done-row" style="display:none">
+                <input type="checkbox" id="task-done">
+                <label for="task-done" style="margin:0">已完成</label>
+            </div>
+            <div class="modal-actions">
+                <button class="danger" id="btn-delete" style="display:none" onclick="deleteCurrentTask()">删除</button>
+                <button class="secondary" onclick="closeTaskModal()">取消</button>
+                <button onclick="saveTask()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 周报弹窗 -->
+    <div class="overlay" id="report-overlay" onclick="if(event.target===this)closeReportModal()">
+        <div class="modal">
+            <h3>生成周报</h3>
+            <div class="form-group">
+                <label>开始日期</label>
+                <input type="date" id="report-start">
+            </div>
+            <div class="form-group">
+                <label>结束日期</label>
+                <input type="date" id="report-end">
+            </div>
+            <p style="font-size:12px;color:#888;margin-bottom:12px">默认已填入上周一至上周日，你可以手动修改后点击生成。</p>
+            <div class="modal-actions" style="margin-bottom:12px">
+                <button onclick="doGenerateReport()">📝 生成周报</button>
+            </div>
+            <textarea class="report-text" id="report-text" readonly></textarea>
+            <div class="modal-actions">
+                <button class="secondary" onclick="closeReportModal()">关闭</button>
+                <button onclick="copyReport()">复制全文</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 月报弹窗 -->
+    <div class="overlay" id="monthly-overlay" onclick="if(event.target===this)closeMonthlyModal()">
+        <div class="modal">
+            <h3>生成月报</h3>
+            <div class="form-group">
+                <label>开始日期</label>
+                <input type="date" id="monthly-start">
+            </div>
+            <div class="form-group">
+                <label>结束日期</label>
+                <input type="date" id="monthly-end">
+            </div>
+            <p style="font-size:12px;color:#888;margin-bottom:12px">默认已填入上月1日至上月最后一日，你可以手动修改后点击生成。</p>
+            <div class="modal-actions" style="margin-bottom:12px">
+                <button onclick="doGenerateMonthlyReport()">📝 生成月报</button>
+            </div>
+            <textarea class="report-text" id="monthly-text" readonly></textarea>
+            <div class="modal-actions">
+                <button class="secondary" onclick="closeMonthlyModal()">关闭</button>
+                <button onclick="copyMonthlyReport()">复制全文</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Excel 导出弹窗 -->
+    <div class="overlay" id="export-overlay" onclick="if(event.target===this)closeExportModal()">
+        <div class="modal">
+            <h3>导出 Excel</h3>
+            <p style="font-size:13px;color:#666;margin-bottom:12px">选择日期范围，将该时间段内的所有任务导出为 Excel 文件。</p>
+            <div class="form-group">
+                <label>开始日期</label>
+                <input type="date" id="export-start">
+            </div>
+            <div class="form-group">
+                <label>结束日期</label>
+                <input type="date" id="export-end">
+            </div>
+            <div id="export-status" style="font-size:13px;color:#1677ff;margin-bottom:12px;display:none"></div>
+            <div class="modal-actions">
+                <button class="secondary" onclick="closeExportModal()">取消</button>
+                <button onclick="doExportExcel()">📤 导出</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Excel 导入弹窗 -->
+    <div class="overlay" id="import-overlay" onclick="if(event.target===this)closeImportModal()">
+        <div class="modal">
+            <h3>导入 Excel 历史数据</h3>
+            <p style="font-size:13px;color:#666;margin-bottom:12px">
+                请选择你的 <code>to do calendar.xlsx</code> 文件。系统会将其中的任务批量导入到 GitHub Issues。<br>
+                <strong>注意：</strong>导入过程可能较慢（每个任务约 1.2 秒），请耐心等待，不要关闭页面。
+            </p>
+            <div class="form-group">
+                <input type="file" id="import-file" accept=".xlsx,.xls">
+            </div>
+            <div id="import-status" style="font-size:13px;color:#1677ff;margin-bottom:12px;display:none"></div>
+            <div class="modal-actions">
+                <button class="secondary" onclick="closeImportModal()">取消</button>
+                <button onclick="startImport()">开始导入</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 统计查询弹窗 -->
+    <div class="overlay" id="stat-overlay" onclick="if(event.target===this)closeStatModal()">
+        <div class="modal">
+            <h3>统计查询</h3>
+            <div class="form-group">
+                <label>开始日期</label>
+                <input type="date" id="stat-start">
+            </div>
+            <div class="form-group">
+                <label>结束日期</label>
+                <input type="date" id="stat-end">
+            </div>
+            <div class="form-group">
+                <label>标签筛选</label>
+                <select id="stat-tag">
+                    <option value="all">全部标签</option>
+                    <option value="LP">LP</option>
+                    <option value="填报">填报</option>
+                    <option value="生活">生活</option>
+                    <option value="其他">其他</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>分类/状态筛选</label>
+                <select id="stat-filter">
+                    <option value="all">全部</option>
+                    <option value="LP相关">LP相关分类</option>
+                    <option value="其他">其他分类</option>
+                    <option value="open">仅未完成</option>
+                    <option value="closed">仅已完成</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>关键词搜索（任务内容/备注）</label>
+                <input type="text" id="stat-keyword" placeholder="例如：太保、立项报告...">
+            </div>
+            <div id="stat-result-area" style="max-height:360px;overflow-y:auto;margin-bottom:12px"></div>
+            <div class="modal-actions">
+                <button class="secondary" onclick="closeStatModal()">关闭</button>
+                <button class="secondary" onclick="exportStatCSV()">导出 CSV</button>
+                <button onclick="runStat()">查询</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 批量完成弹窗 -->
+    <div class="overlay" id="bulk-done-overlay" onclick="if(event.target===this)closeBulkDoneModal()">
+        <div class="modal">
+            <h3>✅ 批量标记完成</h3>
+            <div class="form-group">
+                <label>起始日期</label>
+                <input type="date" id="bulk-done-start" onchange="previewBulkDone()">
+            </div>
+            <div class="form-group">
+                <label>终止日期</label>
+                <input type="date" id="bulk-done-end" onchange="previewBulkDone()">
+            </div>
+            <div id="bulk-done-preview" style="margin-bottom:12px;font-size:13px;color:#666;min-height:20px"></div>
+            <div class="modal-actions">
+                <button class="secondary" onclick="closeBulkDoneModal()">取消</button>
+                <button class="warning" id="btn-bulk-done" onclick="doBulkDone()" disabled>确认标记完成</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 批量清理弹窗 -->
+    <div class="overlay" id="bulk-delete-overlay" onclick="if(event.target===this)closeBulkDeleteModal()">
+        <div class="modal">
+            <h3>🗑️ 批量清理任务</h3>
+            <div class="form-group">
+                <label>起始日期</label>
+                <input type="date" id="bulk-start" onchange="previewBulkDelete()">
+            </div>
+            <div class="form-group">
+                <label>终止日期</label>
+                <input type="date" id="bulk-end" onchange="previewBulkDelete()">
+            </div>
+            <div id="bulk-preview" style="margin-bottom:12px;font-size:13px;color:#666;min-height:20px"></div>
+            <div class="modal-actions">
+                <button class="secondary" onclick="closeBulkDeleteModal()">取消</button>
+                <button class="danger" id="btn-bulk-delete" onclick="doBulkDelete()" disabled>确认清理</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========== 配置管理（localStorage） ==========
+        const CONFIG_KEY = 'todo_calendar_config_v3';
+        let config = null;
+
+        function loadConfig() {
+            try {
+                const raw = localStorage.getItem(CONFIG_KEY);
+                if (raw) config = JSON.parse(raw);
+            } catch(e) { config = null; }
+        }
+
+        function saveConfig() {
+            const user = document.getElementById('cfg-user').value.trim();
+            const repo = document.getElementById('cfg-repo').value.trim();
+            const token = document.getElementById('cfg-token').value.trim();
+            if (!user || !repo || !token) { alert('请填写完整信息'); return; }
+            config = { user, repo, token };
+            localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+            closeConfigModal();
+            loadAllTodos();
+        }
+
+        function clearConfig() {
+            if (!confirm('确定清除本地保存的 GitHub 配置吗？')) return;
+            localStorage.removeItem(CONFIG_KEY);
+            config = null;
+            closeConfigModal();
+            location.reload();
+        }
+
+        function openConfigModal() {
+            if (config) {
+                document.getElementById('cfg-user').value = config.user || '';
+                document.getElementById('cfg-repo').value = config.repo || '';
+                document.getElementById('cfg-token').value = config.token || '';
+            }
+            document.getElementById('config-overlay').classList.add('active');
+        }
+
+        function closeConfigModal() {
+            document.getElementById('config-overlay').classList.remove('active');
+        }
+
+        function isConfigured() {
+            return !!(config && config.user && config.repo && config.token);
+        }
+
+        // ========== API 工具 ==========
+        const API_URL = () => `https://api.github.com/repos/${config.user}/${config.repo}/issues`;
+        const headers = () => ({
+            'Authorization': `token ${config.token}`,
+            'Accept': 'application/vnd.github.v3+json',
+            'Content-Type': 'application/json'
+        });
+
+        let currentYear = new Date().getFullYear();
+        let currentMonth = new Date().getMonth();
+        let allTodos = [];
+        let editingIssue = null;
+        let statData = [];
+        let isLoadingTodos = false;
+        let lastDebugInfo = '';
+
+        function formatDate(d) {
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth()+1).padStart(2,'0');
+            const dd = String(d.getDate()).padStart(2,'0');
+            return `${yyyy}-${mm}-${dd}`;
+        }
+
+        function toDatetimeLocal(d) {
+            if (!d) return '';
+            const date = new Date(d);
+            const yyyy = date.getFullYear();
+            const mm = String(date.getMonth()+1).padStart(2,'0');
+            const dd = String(date.getDate()).padStart(2,'0');
+            const hh = String(date.getHours()).padStart(2,'0');
+            const min = String(date.getMinutes()).padStart(2,'0');
+            return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+        }
+
+        function parseBody(issue) {
+            try {
+                return JSON.parse(issue.body || '{}');
+            } catch(e) {
+                return { date: '', priority: 1, category: 'LP相关', tag: 'LP', note: '' };
+            }
+        }
+
+        function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+        // ========== 数据加载 ==========
+        async function fetchIssues(useLabelFilter) {
+            const results = [];
+            let page = 1;
+            const labelParam = useLabelFilter ? '&labels=todo-calendar' : '';
+            while (true) {
+                // 添加时间戳防止浏览器缓存
+                const ts = Date.now();
+                const res = await fetch(`${API_URL()}?state=all&per_page=100&page=${page}${labelParam}&_=${ts}`, {
+                    headers: headers(),
+                    cache: 'no-store'
+                });
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    const errMsg = errData.message || `HTTP ${res.status}`;
+                    if (res.status === 401) {
+                        throw new Error('Token 无效或已过期（401）。请检查配置中的 Token 是否正确。');
+                    } else if (res.status === 404) {
+                        throw new Error('仓库不存在（404）。请检查用户名和仓库名是否拼写正确。');
+                    } else if (res.status === 403) {
+                        throw new Error('权限不足（403）。请检查 Token 是否勾选了 repo 权限。');
+                    } else {
+                        throw new Error('API 请求失败：' + errMsg);
+                    }
+                }
+                const issues = await res.json();
+                if (!issues.length) break;
+                results.push(...issues);
+                if (issues.length < 100) break;
+                page++;
+            }
+            return results;
+        }
+
+        async function loadAllTodos(silent = false) {
+            if (isLoadingTodos) { console.log('[加载跳过] 已有加载任务正在进行'); return; }
+            isLoadingTodos = true;
+
+            try {
+                if (!isConfigured()) {
+                    document.getElementById('config-notice').style.display = 'block';
+                    if (!silent) document.getElementById('calendar-container').innerHTML = '<div class="loading">请在右上角点击「配置」输入 GitHub 信息</div>';
+                    return;
+                }
+                document.getElementById('config-notice').style.display = 'none';
+                if (!silent) document.getElementById('calendar-container').innerHTML = '<div class="loading">正在同步云端数据...</div>';
+
+                // 先尝试用标签过滤加载
+                let issues = await fetchIssues(true);
+                let usedLabelFilter = true;
+
+                // 如果用标签过滤没数据，尝试加载所有 Issues（兜底）
+                if (issues.length === 0) {
+                    const allIssues = await fetchIssues(false);
+                    if (allIssues.length > 0) {
+                        issues = allIssues;
+                        usedLabelFilter = false;
+                    }
+                }
+
+                allTodos = issues.map(i => ({ ...i, _body: parseBody(i) })).filter(t => !t._body.deleted);
+
+                renderCalendar();
+                renderTodayBanner();
+
+                // 界面只显示简洁计数
+                const countEl = document.getElementById('loaded-count');
+                if (countEl) countEl.textContent = `（已同步 ${allTodos.length} 个任务）`;
+
+                // 详细诊断信息放入调试面板
+                let debugText = `加载方式: ${usedLabelFilter ? '按标签过滤' : '全部加载'}\n任务总数: ${allTodos.length}\n`;
+                if (allTodos.length === 0) {
+                    debugText += '⚠️ 已同步 0 个任务。如果你刚保存了任务但看不到，请去 GitHub Issues 页面检查任务是否有 todo-calendar 标签\n';
+                }
+                if (!usedLabelFilter && allTodos.length > 0) {
+                    debugText += '⚠️ 未按标签过滤，部分任务可能缺少 todo-calendar 标签\n';
+                }
+                if (allTodos.length > 0) {
+                    debugText += '前3个任务: ';
+                    allTodos.slice(0, 3).forEach(t => {
+                        debugText += `[日期:${t._body.date || '无'} 标题:${t.title.substring(0,15)}] `;
+                    });
+                }
+                lastDebugInfo = debugText;
+            } catch (err) {
+                console.error(err);
+                document.getElementById('calendar-container').innerHTML =
+                    `<div class="loading" style="color:#ff4d4f">加载失败：${err.message}<br><br>如果刚保存了任务但看不到，通常是因为上述错误导致保存实际上没有成功。请检查配置后刷新页面。</div>`;
+            } finally {
+                isLoadingTodos = false;
+            }
+        }
+
+        // ========== 今日待办横幅 ==========
+        function renderTodayBanner() {
+            const todayStr = formatDate(new Date());
+            const todayTodos = allTodos.filter(t => t._body.date === todayStr && t.state === 'open');
+            const banner = document.getElementById('today-banner');
+            const list = document.getElementById('today-list');
+            const count = document.getElementById('today-count');
+
+            if (!todayTodos.length) { banner.style.display = 'none'; return; }
+
+            todayTodos.sort((a, b) => (b._body.priority || 1) - (a._body.priority || 1));
+            count.textContent = todayTodos.length;
+            list.innerHTML = todayTodos.map(t => {
+                const stars = '★'.repeat(t._body.priority || 1);
+                let badgeClass = 'badge-other', badgeText = '其他';
+                if (t._body.tag === 'LP') { badgeClass = 'badge-lp'; badgeText = 'LP'; }
+                else if (t._body.tag === '填报') { badgeClass = 'badge-report'; badgeText = '填报'; }
+                else if (t._body.tag === '生活') { badgeClass = 'badge-life'; badgeText = '生活'; }
+                else if (t._body.tag === '其他') { badgeClass = 'badge-other'; badgeText = '其他'; }
+                const bell = t._body.reminder ? '<span class="bell">🔔</span>' : '';
+                return `<li><span class="badge ${badgeClass}">${badgeText}</span><span>${escapeHtml(t.title)}</span><span style="color:#ff9800;margin-left:4px">${stars}</span>${bell}</li>`;
+            }).join('');
+            banner.style.display = 'block';
+        }
+
+        // ========== 日历渲染 ==========
+        function renderCalendar() {
+            const container = document.getElementById('calendar-container');
+            const firstDay = new Date(currentYear, currentMonth, 1);
+            const lastDay = new Date(currentYear, currentMonth + 1, 0);
+            const startWeekday = firstDay.getDay();
+            const daysInMonth = lastDay.getDate();
+            const prevMonthDays = new Date(currentYear, currentMonth, 0).getDate();
+
+            document.getElementById('month-title').textContent = `${currentYear}年${currentMonth + 1}月`;
+
+            let html = `
+                <div class="weekday">周日</div>
+                <div class="weekday">周一</div>
+                <div class="weekday">周二</div>
+                <div class="weekday">周三</div>
+                <div class="weekday">周四</div>
+                <div class="weekday">周五</div>
+                <div class="weekday">周六</div>
+            `;
+
+            const todayStr = formatDate(new Date());
+
+            for (let i = startWeekday - 1; i >= 0; i--) {
+                const d = prevMonthDays - i;
+                html += `<div class="day-cell other-month"><div class="day-header"><span class="day-number">${d}</span></div></div>`;
+            }
+
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dateStr = formatDate(new Date(currentYear, currentMonth, d));
+                const isToday = dateStr === todayStr;
+                const dayTodos = allTodos.filter(t => t._body.date === dateStr);
+                dayTodos.sort((a, b) => {
+                    if (a.state === 'open' && b.state === 'closed') return -1;
+                    if (a.state === 'closed' && b.state === 'open') return 1;
+                    return (b._body.priority || 1) - (a._body.priority || 1);
+                });
+
+                let todosHtml = '';
+                dayTodos.forEach(t => {
+                    const stars = '★'.repeat(t._body.priority || 1);
+                    const cls = t.state === 'open' ? 'open' : 'closed';
+                    let tagIcon = '<span class="tag-icon tag-lp-icon">LP</span>';
+                    if (t._body.tag === '填报') tagIcon = '<span class="tag-icon tag-report-icon">报</span>';
+                    else if (t._body.tag === '生活') tagIcon = '<span class="tag-icon tag-life-icon">生</span>';
+                    else if (t._body.tag === '其他') tagIcon = '<span class="tag-icon tag-other-icon">其</span>';
+                    const bell = t._body.reminder ? '<span class="bell">🔔</span>' : '';
+                    todosHtml += `
+                        <div class="todo-card ${cls}" onclick="event.stopPropagation(); openEditModal(${t.number})">
+                            ${tagIcon}
+                            <span class="stars">${stars}</span>
+                            <span class="text">${escapeHtml(t.title)}</span>
+                            ${bell}
+                        </div>
+                    `;
+                });
+
+                html += `
+                    <div class="day-cell ${isToday ? 'today' : ''}" onclick="openAddModal('${dateStr}')">
+                        <div class="day-header">
+                            <span class="day-number">${d}</span>
+                            ${dayTodos.length > 0 ? `<span class="day-count">${dayTodos.filter(t=>t.state==='open').length}/${dayTodos.length}</span>` : ''}
+                        </div>
+                        <div class="todos-container">
+                            ${todosHtml}
+                            ${dayTodos.length === 0 ? '<div class="add-hint">+ 添加</div>' : ''}
+                        </div>
+                    </div>
+                `;
+            }
+
+            const remaining = (7 - ((startWeekday + daysInMonth) % 7)) % 7;
+            for (let d = 1; d <= remaining; d++) {
+                html += `<div class="day-cell other-month"><div class="day-header"><span class="day-number">${d}</span></div></div>`;
+            }
+
+            container.innerHTML = `<div class="calendar">${html}</div>`;
+
+            // 渲染诊断：检查特定日期是否有任务
+            const checkDate = '2026-04-18';
+            const found = allTodos.filter(t => t._body.date === checkDate);
+            console.log(`[渲染诊断] 当前显示: ${currentYear}年${currentMonth+1}月 | ${checkDate}有${found.length}个任务`);
+        }
+
+        function changeMonth(delta) {
+            currentMonth += delta;
+            if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+            if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+            renderCalendar();
+            renderTodayBanner();
+        }
+
+        function toggleDebugPanel() {
+            const panel = document.getElementById('debug-panel');
+            if (!panel) return;
+            if (panel.style.display === 'none' || panel.style.display === '') {
+                panel.textContent = lastDebugInfo || '暂无调试信息，请先刷新页面加载数据。';
+                panel.style.display = 'block';
+            } else {
+                panel.style.display = 'none';
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // ========== 弹窗控制 ==========
+        function onTagChange() {
+            const tag = document.getElementById('task-tag').value;
+            const catGroup = document.getElementById('category-group');
+            const catSelect = document.getElementById('task-category');
+            if (tag === '生活' || tag === '其他') {
+                catGroup.style.display = 'none';
+                if (tag === '其他') catSelect.value = '其他';
+            } else {
+                catGroup.style.display = 'block';
+                catSelect.value = 'LP相关';
+            }
+        }
+
+        function openAddModal(dateStr) {
+            editingIssue = null;
+            document.getElementById('task-modal-title').textContent = '添加任务';
+            document.getElementById('task-date').value = dateStr;
+            document.getElementById('task-text').value = '';
+            document.getElementById('task-tag').value = 'LP';
+            document.getElementById('task-priority').value = '1';
+            document.getElementById('task-category').value = 'LP相关';
+            document.getElementById('task-reminder').value = '';
+            document.getElementById('task-note').value = '';
+            document.getElementById('task-done').checked = false;
+            document.getElementById('done-row').style.display = 'none';
+            document.getElementById('btn-delete').style.display = 'none';
+            onTagChange();
+            document.getElementById('task-overlay').classList.add('active');
+            setTimeout(() => document.getElementById('task-text').focus(), 100);
+        }
+
+        function openEditModal(issueNumber) {
+            const issue = allTodos.find(t => t.number === issueNumber);
+            if (!issue) return;
+            editingIssue = issue;
+            document.getElementById('task-modal-title').textContent = '编辑任务';
+            document.getElementById('task-date').value = issue._body.date || '';
+            document.getElementById('task-text').value = issue.title || '';
+            document.getElementById('task-tag').value = issue._body.tag || 'LP';
+            document.getElementById('task-priority').value = String(issue._body.priority || 1);
+            document.getElementById('task-category').value = issue._body.category || 'LP相关';
+            document.getElementById('task-reminder').value = issue._body.reminder ? toDatetimeLocal(issue._body.reminder) : '';
+            document.getElementById('task-note').value = issue._body.note || '';
+            document.getElementById('task-done').checked = issue.state === 'closed';
+            document.getElementById('done-row').style.display = 'flex';
+            document.getElementById('btn-delete').style.display = 'inline-block';
+            onTagChange();
+            document.getElementById('task-overlay').classList.add('active');
+        }
+
+        function closeTaskModal() {
+            document.getElementById('task-overlay').classList.remove('active');
+            editingIssue = null;
+        }
+
+        async function saveTask() {
+            const date = document.getElementById('task-date').value;
+            const title = document.getElementById('task-text').value.trim();
+            const tag = document.getElementById('task-tag').value;
+            const priority = parseInt(document.getElementById('task-priority').value);
+            const category = tag === '生活' ? '生活' : document.getElementById('task-category').value;
+            const reminderVal = document.getElementById('task-reminder').value;
+            const reminder = reminderVal ? new Date(reminderVal).toISOString() : '';
+            const note = document.getElementById('task-note').value.trim();
+            const done = document.getElementById('task-done').checked;
+            if (!title) { alert('请输入任务内容'); return; }
+
+            const bodyObj = { date, tag, priority, category, note };
+            if (reminder) bodyObj.reminder = reminder;
+            const state = done ? 'closed' : 'open';
+
+            try {
+                let res;
+                if (editingIssue) {
+                    res = await fetch(`${API_URL()}/${editingIssue.number}`, {
+                        method: 'PATCH',
+                        headers: headers(),
+                        cache: 'no-store',
+                        body: JSON.stringify({ title, body: JSON.stringify(bodyObj), state })
+                    });
+                } else {
+                    res = await fetch(API_URL(), {
+                        method: 'POST',
+                        headers: headers(),
+                        cache: 'no-store',
+                        body: JSON.stringify({ title, body: JSON.stringify(bodyObj), labels: ['todo-calendar'] })
+                    });
+                }
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}));
+                    const errMsg = errData.message || `HTTP ${res.status}`;
+                    if (res.status === 401) {
+                        throw new Error('Token 无效或已过期（401）。请在配置中检查 Token 是否正确。');
+                    } else if (res.status === 404) {
+                        throw new Error('仓库不存在（404）。请检查用户名和仓库名是否拼写正确。');
+                    } else if (res.status === 403) {
+                        throw new Error('权限不足（403）。请检查 Token 是否勾选了 repo 权限。');
+                    } else {
+                        throw new Error('保存失败：' + errMsg);
+                    }
+                }
+                const savedIssue = await res.json();
+                closeTaskModal();
+
+                // 本地即时更新，避免 GitHub API 写入延迟导致看不到
+                const parsed = { ...savedIssue, _body: parseBody(savedIssue) };
+                // 先过滤掉同 number 的旧记录（防止引用断裂导致重复），再插入新数据
+                allTodos = allTodos.filter(t => t.number !== parsed.number);
+                allTodos.push(parsed);
+                renderCalendar();
+                renderTodayBanner();
+            } catch (err) {
+                alert(err.message || '保存失败，请检查网络或 GitHub 配置');
+            }
+        }
+
+        async function deleteCurrentTask() {
+            if (!editingIssue) return;
+            if (!confirm('确定删除这个任务吗？')) return;
+            try {
+                const b = editingIssue._body;
+                b.deleted = true;
+                await fetch(`${API_URL()}/${editingIssue.number}`, {
+                    method: 'PATCH',
+                    headers: headers(),
+                    body: JSON.stringify({ state: 'closed', body: JSON.stringify(b) })
+                });
+                closeTaskModal();
+                // 本地即时移除，避免 GitHub API 写入延迟
+                allTodos = allTodos.filter(t => t.number !== editingIssue.number);
+                renderCalendar();
+                renderTodayBanner();
+            } catch (err) {
+                alert('删除失败：' + err.message);
+            }
+        }
+
+        // ========== 周报生成 ==========
+        function getThisWeekRange() {
+            const now = new Date();
+            const day = now.getDay();
+            const diffToMonday = day === 0 ? 6 : day - 1;
+            const monday = new Date(now);
+            monday.setDate(now.getDate() - diffToMonday);
+            monday.setHours(0,0,0,0);
+            const sunday = new Date(monday);
+            sunday.setDate(monday.getDate() + 6);
+            sunday.setHours(23,59,59,999);
+            return { start: monday, end: sunday };
+        }
+
+        function getLastWeekRange() {
+            const now = new Date();
+            const day = now.getDay();
+            const diffToMonday = day === 0 ? 6 : day - 1;
+            const monday = new Date(now);
+            monday.setDate(now.getDate() - diffToMonday - 7);
+            monday.setHours(0,0,0,0);
+            const sunday = new Date(monday);
+            sunday.setDate(monday.getDate() + 6);
+            sunday.setHours(23,59,59,999);
+            return { start: monday, end: sunday };
+        }
+
+        function generateReport() {
+            if (!isConfigured()) { alert('请先配置 GitHub 信息'); return; }
+
+            // 设置默认日期为本周一~本周日
+            const { start: defaultStart, end: defaultEnd } = getThisWeekRange();
+            const startInput = document.getElementById('report-start');
+            const endInput = document.getElementById('report-end');
+
+            startInput.value = formatDate(defaultStart);
+            endInput.value = formatDate(defaultEnd);
+
+            // 清空之前生成的报告
+            document.getElementById('report-text').value = '';
+
+            // 打开弹窗
+            document.getElementById('report-overlay').classList.add('active');
+        }
+
+        function doGenerateReport() {
+            const startStr = document.getElementById('report-start').value;
+            const endStr = document.getElementById('report-end').value;
+            if (!startStr || !endStr) { alert('请选择日期范围'); return; }
+
+            const start = new Date(startStr + 'T00:00:00');
+            const end = new Date(endStr + 'T23:59:59');
+            if (start > end) { alert('开始日期不能晚于结束日期'); return; }
+
+            let filteredTodos = allTodos.filter(t => {
+                if (t._body.deleted) return false;
+                const d = new Date(t._body.date + 'T00:00:00');
+                return d >= start && d <= end;
+            });
+
+            // 排除生活标签
+            filteredTodos = filteredTodos.filter(t => t._body.tag !== '生活');
+
+            filteredTodos.sort((a, b) => {
+                const da = new Date(a._body.date), db = new Date(b._body.date);
+                if (da - db !== 0) return da - db;
+                if (a.state === 'open' && b.state === 'closed') return -1;
+                if (a.state === 'closed' && b.state === 'open') return 1;
+                return (b._body.priority || 1) - (a._body.priority || 1);
+            });
+
+            // 分离 LP相关/其他，同时分离填报标签
+            const lpWithReport = filteredTodos.filter(t => t._body.category !== '其他' && t._body.tag === '填报');
+            const lpPure = filteredTodos.filter(t => t._body.category !== '其他' && t._body.tag !== '填报');
+            const others = filteredTodos.filter(t => t._body.category === '其他');
+
+            let report = `${startStr} 至 ${endStr} 工作小结如下：\nLP相关：\n`;
+            let idx = 1;
+
+            // 如果有填报任务，统一用一句话概括
+            if (lpWithReport.length > 0) {
+                report += `${idx})\tLP信披填报\n`;
+                idx++;
+            }
+
+            // 纯 LP 任务详细列出
+            if (lpPure.length === 0 && lpWithReport.length === 0) {
+                report += '（无）\n';
+            } else {
+                lpPure.forEach(t => {
+                    report += `${idx})\t${t.title}\n`;
+                    idx++;
+                });
+            }
+
+            if (others.length > 0) {
+                report += '\n其他：\n';
+                others.forEach((t, i) => {
+                    report += `${i+1})\t${t.title}\n`;
+                });
+            }
+
+            document.getElementById('report-text').value = report;
+        }
+
+        function closeReportModal() {
+            document.getElementById('report-overlay').classList.remove('active');
+        }
+
+        function copyReport() {
+            const el = document.getElementById('report-text');
+            el.select();
+            document.execCommand('copy');
+            alert('周报已复制到剪贴板');
+        }
+
+        // ========== 月报生成 ==========
+        function getThisMonthRange() {
+            const now = new Date();
+            const start = new Date(now.getFullYear(), now.getMonth(), 1);
+            const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            return { start, end };
+        }
+
+        function getLastMonthRange() {
+            const now = new Date();
+            const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            const end = new Date(now.getFullYear(), now.getMonth(), 0);
+            return { start, end };
+        }
+
+        function generateMonthlyReport() {
+            if (!isConfigured()) { alert('请先配置 GitHub 信息'); return; }
+
+            const { start: defaultStart, end: defaultEnd } = getThisMonthRange();
+            document.getElementById('monthly-start').value = formatDate(defaultStart);
+            document.getElementById('monthly-end').value = formatDate(defaultEnd);
+            document.getElementById('monthly-text').value = '';
+            document.getElementById('monthly-overlay').classList.add('active');
+        }
+
+        function doGenerateMonthlyReport() {
+            const startStr = document.getElementById('monthly-start').value;
+            const endStr = document.getElementById('monthly-end').value;
+            if (!startStr || !endStr) { alert('请选择日期范围'); return; }
+
+            const start = new Date(startStr + 'T00:00:00');
+            const end = new Date(endStr + 'T23:59:59');
+            if (start > end) { alert('开始日期不能晚于结束日期'); return; }
+
+            let filtered = allTodos.filter(t => {
+                if (t._body.deleted) return false;
+                if (t._body.tag === '生活') return false;
+                const d = new Date(t._body.date + 'T00:00:00');
+                return d >= start && d <= end;
+            });
+
+            filtered.sort((a, b) => new Date(a._body.date) - new Date(b._body.date));
+
+            // 按用户要求分组（只按标签分，避免和分类交叉导致重复）
+            const lpHigh = filtered.filter(t => t._body.tag === 'LP' && t._body.priority === 3);
+            const lpLow = filtered.filter(t => t._body.tag === 'LP' && (t._body.priority === 1 || t._body.priority === 2));
+            const reportTasks = filtered.filter(t => t._body.tag === '填报');
+            const others = filtered.filter(t => t._body.tag === '其他');
+
+            let report = `${startStr} 至 ${endStr} 月报如下：\n\n`;
+
+            if (lpHigh.length > 0) {
+                report += `【LP 相关工作 - 高优先级（★★★）】\n`;
+                lpHigh.forEach((t, i) => report += `${i+1})\t${t.title}\n`);
+                report += '\n';
+            }
+
+            if (lpLow.length > 0) {
+                report += `【LP 相关工作 - 中低优先级（★/★★）】\n`;
+                lpLow.forEach((t, i) => report += `${i+1})\t${t.title}\n`);
+                report += '\n';
+            }
+
+            if (reportTasks.length > 0) {
+                report += `【填报类工作】\n`;
+                reportTasks.forEach((t, i) => report += `${i+1})\t${t.title}\n`);
+                report += '\n';
+            }
+
+            if (others.length > 0) {
+                report += `【其他】\n`;
+                others.forEach((t, i) => report += `${i+1})\t${t.title}\n`);
+            }
+
+            if (lpHigh.length === 0 && lpLow.length === 0 && reportTasks.length === 0 && others.length === 0) {
+                report += '（该时间段内无符合条件的任务）\n';
+            }
+
+            document.getElementById('monthly-text').value = report;
+        }
+
+        function closeMonthlyModal() {
+            document.getElementById('monthly-overlay').classList.remove('active');
+        }
+
+        function copyMonthlyReport() {
+            const el = document.getElementById('monthly-text');
+            el.select();
+            document.execCommand('copy');
+            alert('月报已复制到剪贴板');
+        }
+
+        // ========== Excel 导出 ==========
+        function openExportModal() {
+            if (!isConfigured()) { alert('请先配置 GitHub 信息'); return; }
+            document.getElementById('export-overlay').classList.add('active');
+        }
+        function closeExportModal() {
+            document.getElementById('export-overlay').classList.remove('active');
+            document.getElementById('export-status').style.display = 'none';
+        }
+        function doExportExcel() {
+            const startStr = document.getElementById('export-start').value;
+            const endStr = document.getElementById('export-end').value;
+            if (!startStr || !endStr) { alert('请选择日期范围'); return; }
+
+            const start = new Date(startStr + 'T00:00:00');
+            const end = new Date(endStr + 'T23:59:59');
+            if (start > end) { alert('开始日期不能晚于结束日期'); return; }
+
+            let filtered = allTodos.filter(t => {
+                if (t._body.deleted) return false;
+                const d = new Date(t._body.date + 'T00:00:00');
+                return d >= start && d <= end;
+            });
+
+            filtered.sort((a, b) => {
+                const da = a._body.date, db = b._body.date;
+                if (da !== db) return da.localeCompare(db);
+                return (b._body.priority || 1) - (a._body.priority || 1);
+            });
+
+            if (filtered.length === 0) {
+                alert('该时间段内没有任务可导出');
+                return;
+            }
+
+            const statusEl = document.getElementById('export-status');
+            statusEl.style.display = 'block';
+            statusEl.textContent = `正在导出 ${filtered.length} 个任务...`;
+
+            // 构建表格数据
+            const rows = [['日期', '任务内容', '标签', '优先级', '分类', '状态', '备注']];
+            filtered.forEach(t => {
+                rows.push([
+                    t._body.date,
+                    t.title,
+                    t._body.tag || 'LP',
+                    '★'.repeat(t._body.priority || 1),
+                    t._body.category || 'LP相关',
+                    t.state === 'open' ? '未完成' : '已完成',
+                    t._body.note || ''
+                ]);
+            });
+
+            const ws = XLSX.utils.aoa_to_sheet(rows);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Tasks');
+            XLSX.writeFile(wb, `todo_export_${startStr}_${endStr}.xlsx`);
+
+            statusEl.textContent = '导出成功！';
+            setTimeout(closeExportModal, 1000);
+        }
+
+        // ========== Excel 导入 ==========
+        function openImportModal() {
+            if (!isConfigured()) { alert('请先配置 GitHub 信息'); return; }
+            document.getElementById('import-overlay').classList.add('active');
+        }
+        function closeImportModal() {
+            document.getElementById('import-overlay').classList.remove('active');
+            document.getElementById('import-status').style.display = 'none';
+        }
+
+        async function startImport() {
+            const fileInput = document.getElementById('import-file');
+            if (!fileInput.files.length) { alert('请先选择文件'); return; }
+
+            const statusEl = document.getElementById('import-status');
+            statusEl.style.display = 'block';
+            statusEl.textContent = '正在解析 Excel...';
+
+            const file = fileInput.files[0];
+            const data = await file.arrayBuffer();
+            const workbook = XLSX.read(data, { type: 'array' });
+            const ws = workbook.Sheets[workbook.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+
+            if (rows.length < 3) { alert('Excel 格式不符合预期'); return; }
+
+            const dates = [];
+            const dateRow = rows[0];
+            for (let c = 1; c < dateRow.length; c++) {
+                const val = dateRow[c];
+                if (typeof val === 'number') {
+                    const jsDate = new Date((val - 25569) * 86400 * 1000);
+                    dates.push(formatDate(jsDate));
+                } else if (val instanceof Date) {
+                    dates.push(formatDate(val));
+                } else {
+                    dates.push(null);
+                }
+            }
+
+            const tasks = [];
+            for (let r = 2; r < rows.length; r += 2) {
+                const taskRow = rows[r];
+                const noteRow = rows[r + 1] || [];
+                if (!taskRow) continue;
+                for (let c = 1; c < taskRow.length && c - 1 < dates.length; c++) {
+                    const text = taskRow[c];
+                    if (!text || !text.toString().trim()) continue;
+                    const dateStr = dates[c - 1];
+                    if (!dateStr) continue;
+                    const note = noteRow[c] ? noteRow[c].toString().trim() : '';
+                    tasks.push({
+                        title: text.toString().trim(),
+                        body: { date: dateStr, tag: 'LP', priority: 1, category: 'LP相关', note }
+                    });
+                }
+            }
+
+            if (!tasks.length) { alert('未找到可导入的任务，请检查文件'); return; }
+            if (!confirm(`解析到 ${tasks.length} 个任务，确认开始导入到 GitHub Issues？\n\n注意：此过程约需 ${Math.ceil(tasks.length * 1.2)} 秒，请勿关闭页面。`)) return;
+
+            let success = 0, failed = 0;
+            for (let i = 0; i < tasks.length; i++) {
+                const t = tasks[i];
+                statusEl.textContent = `正在导入 ${i+1}/${tasks.length}：${t.title.substring(0,20)}...`;
+                try {
+                    const res = await fetch(API_URL(), {
+                        method: 'POST',
+                        headers: headers(),
+                        body: JSON.stringify({ title: t.title, body: JSON.stringify(t.body), labels: ['todo-calendar'] })
+                    });
+                    if (res.ok) success++; else failed++;
+                } catch(e) { failed++; }
+                await sleep(1200);
+            }
+
+            statusEl.textContent = `导入完成：成功 ${success} 个，失败 ${failed} 个。`;
+            await loadAllTodos();
+            setTimeout(closeImportModal, 1500);
+        }
+
+        // ========== 统计查询 ==========
+        function openStatModal() {
+            if (!isConfigured()) { alert('请先配置 GitHub 信息'); return; }
+            document.getElementById('stat-overlay').classList.add('active');
+            document.getElementById('stat-result-area').innerHTML = '';
+            statData = [];
+        }
+        function closeStatModal() {
+            document.getElementById('stat-overlay').classList.remove('active');
+        }
+
+        function runStat() {
+            const start = document.getElementById('stat-start').value;
+            const end = document.getElementById('stat-end').value;
+            const tagFilter = document.getElementById('stat-tag').value;
+            const extraFilter = document.getElementById('stat-filter').value;
+            const keyword = document.getElementById('stat-keyword').value.trim().toLowerCase();
+
+            if (!start || !end) { alert('请选择开始和结束日期'); return; }
+
+            let filtered = allTodos.filter(t => {
+                if (t._body.deleted) return false;
+                const d = t._body.date;
+                return d >= start && d <= end;
+            });
+
+            if (tagFilter !== 'all') {
+                filtered = filtered.filter(t => t._body.tag === tagFilter);
+            }
+            if (extraFilter === 'LP相关') {
+                filtered = filtered.filter(t => t._body.category === 'LP相关');
+            } else if (extraFilter === '其他') {
+                filtered = filtered.filter(t => t._body.category === '其他');
+            } else if (extraFilter === 'open') {
+                filtered = filtered.filter(t => t.state === 'open');
+            } else if (extraFilter === 'closed') {
+                filtered = filtered.filter(t => t.state === 'closed');
+            }
+
+            // 关键词搜索（标题+备注）
+            if (keyword) {
+                filtered = filtered.filter(t => {
+                    const inTitle = t.title.toLowerCase().includes(keyword);
+                    const inNote = (t._body.note || '').toLowerCase().includes(keyword);
+                    return inTitle || inNote;
+                });
+            }
+
+            filtered.sort((a, b) => {
+                const da = a._body.date, db = b._body.date;
+                if (da !== db) return da.localeCompare(db);
+                return (b._body.priority || 1) - (a._body.priority || 1);
+            });
+
+            statData = filtered;
+
+            const area = document.getElementById('stat-result-area');
+            if (!filtered.length) {
+                area.innerHTML = '<p style="color:#888;padding:12px 0">未找到符合条件的任务。</p>';
+                return;
+            }
+
+            let html = `<p style="font-size:13px;color:#666;margin-bottom:8px">共找到 <strong>${filtered.length}</strong> 个任务</p>`;
+            html += '<table class="stat-table"><tr><th>日期</th><th>标签</th><th>优先级</th><th>状态</th><th>任务</th><th>备注</th></tr>';
+            filtered.forEach(t => {
+                const tag = t._body.tag || 'LP';
+                const stars = '★'.repeat(t._body.priority || 1);
+                const state = t.state === 'open' ? '未完成' : '已完成';
+                const note = escapeHtml(t._body.note || '').substring(0, 20);
+                html += `<tr><td>${t._body.date}</td><td>${tag}</td><td>${stars}</td><td>${state}</td><td>${escapeHtml(t.title)}</td><td>${note}${t._body.note && t._body.note.length > 20 ? '...' : ''}</td></tr>`;
+            });
+            html += '</table>';
+            area.innerHTML = html;
+        }
+
+        function exportStatCSV() {
+            if (!statData.length) { alert('请先执行查询'); return; }
+            let csv = '\uFEFF日期,标签,分类,优先级,状态,任务内容,备注\n';
+            statData.forEach(t => {
+                const cells = [
+                    t._body.date,
+                    t._body.tag || 'LP',
+                    t._body.category || 'LP相关',
+                    '★'.repeat(t._body.priority || 1),
+                    t.state === 'open' ? '未完成' : '已完成',
+                    t.title,
+                    (t._body.note || '').replace(/,/g, '，').replace(/\n/g, ' ')
+                ];
+                csv += cells.map(c => `"${c}"`).join(',') + '\n';
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `todo_stat_${document.getElementById('stat-start').value}_${document.getElementById('stat-end').value}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // ========== 批量清理 ==========
+        function openBulkDeleteModal() {
+            if (!isConfigured()) { alert('请先配置 GitHub 信息'); return; }
+            document.getElementById('bulk-start').value = '';
+            document.getElementById('bulk-end').value = '';
+            document.getElementById('bulk-preview').textContent = '';
+            document.getElementById('btn-bulk-delete').disabled = true;
+            document.getElementById('bulk-delete-overlay').classList.add('active');
+        }
+        function closeBulkDeleteModal() {
+            document.getElementById('bulk-delete-overlay').classList.remove('active');
+        }
+        function previewBulkDelete() {
+            const startStr = document.getElementById('bulk-start').value;
+            const endStr = document.getElementById('bulk-end').value;
+            const previewEl = document.getElementById('bulk-preview');
+            const btn = document.getElementById('btn-bulk-delete');
+            if (!startStr || !endStr) {
+                previewEl.textContent = '';
+                btn.disabled = true;
+                return;
+            }
+            if (startStr > endStr) {
+                previewEl.innerHTML = '<span style="color:#ff4d4f">起始日期不能晚于终止日期</span>';
+                btn.disabled = true;
+                return;
+            }
+            const targets = allTodos.filter(t => {
+                const d = t._body.date;
+                return d && d >= startStr && d <= endStr;
+            });
+            previewEl.innerHTML = `该日期范围内共有 <strong>${targets.length}</strong> 个任务，清理后将无法恢复。`;
+            btn.disabled = targets.length === 0;
+        }
+        async function doBulkDelete() {
+            const startStr = document.getElementById('bulk-start').value;
+            const endStr = document.getElementById('bulk-end').value;
+            if (!startStr || !endStr || startStr > endStr) return;
+            const targets = allTodos.filter(t => {
+                const d = t._body.date;
+                return d && d >= startStr && d <= endStr;
+            });
+            if (targets.length === 0) return;
+            if (!confirm(`确定要清理 ${targets.length} 个任务吗？此操作不可恢复。`)) return;
+
+            const btn = document.getElementById('btn-bulk-delete');
+            btn.disabled = true;
+            btn.textContent = '清理中...';
+            let success = 0, failed = 0;
+
+            for (const t of targets) {
+                try {
+                    const b = { ...t._body, deleted: true };
+                    const res = await fetch(`${API_URL()}/${t.number}`, {
+                        method: 'PATCH',
+                        headers: headers(),
+                        body: JSON.stringify({ state: 'closed', body: JSON.stringify(b) })
+                    });
+                    if (res.ok) success++;
+                    else failed++;
+                } catch (e) {
+                    failed++;
+                }
+                if (targets.length > 1) await sleep(1000);
+            }
+
+            // 本地即时移除
+            const targetNumbers = new Set(targets.map(t => t.number));
+            allTodos = allTodos.filter(t => !targetNumbers.has(t.number));
+            renderCalendar();
+            renderTodayBanner();
+
+            closeBulkDeleteModal();
+            btn.textContent = '确认清理';
+            btn.disabled = false;
+            if (failed > 0) {
+                alert(`清理完成：成功 ${success} 个，失败 ${failed} 个。失败的任务刷新后可能仍会显示，请重试。`);
+            }
+        }
+
+        // ========== 批量完成 ==========
+        function openBulkDoneModal() {
+            if (!isConfigured()) { alert('请先配置 GitHub 信息'); return; }
+            document.getElementById('bulk-done-start').value = '';
+            document.getElementById('bulk-done-end').value = '';
+            document.getElementById('bulk-done-preview').textContent = '';
+            document.getElementById('btn-bulk-done').disabled = true;
+            document.getElementById('bulk-done-overlay').classList.add('active');
+        }
+        function closeBulkDoneModal() {
+            document.getElementById('bulk-done-overlay').classList.remove('active');
+        }
+        function previewBulkDone() {
+            const startStr = document.getElementById('bulk-done-start').value;
+            const endStr = document.getElementById('bulk-done-end').value;
+            const previewEl = document.getElementById('bulk-done-preview');
+            const btn = document.getElementById('btn-bulk-done');
+            if (!startStr || !endStr) {
+                previewEl.textContent = '';
+                btn.disabled = true;
+                return;
+            }
+            if (startStr > endStr) {
+                previewEl.innerHTML = '<span style="color:#ff4d4f">起始日期不能晚于终止日期</span>';
+                btn.disabled = true;
+                return;
+            }
+            const targets = allTodos.filter(t => {
+                const d = t._body.date;
+                return d && d >= startStr && d <= endStr && t.state === 'open';
+            });
+            previewEl.innerHTML = `该日期范围内共有 <strong>${targets.length}</strong> 个未完成任务将被标记为已完成。`;
+            btn.disabled = targets.length === 0;
+        }
+        async function doBulkDone() {
+            const startStr = document.getElementById('bulk-done-start').value;
+            const endStr = document.getElementById('bulk-done-end').value;
+            if (!startStr || !endStr || startStr > endStr) return;
+            const targets = allTodos.filter(t => {
+                const d = t._body.date;
+                return d && d >= startStr && d <= endStr && t.state === 'open';
+            });
+            if (targets.length === 0) return;
+            if (!confirm(`确定要将 ${targets.length} 个任务标记为已完成吗？`)) return;
+
+            const btn = document.getElementById('btn-bulk-done');
+            btn.disabled = true;
+            btn.textContent = '处理中...';
+            let success = 0, failed = 0;
+
+            for (const t of targets) {
+                try {
+                    const b = { ...t._body };
+                    const res = await fetch(`${API_URL()}/${t.number}`, {
+                        method: 'PATCH',
+                        headers: headers(),
+                        body: JSON.stringify({ state: 'closed', body: JSON.stringify(b) })
+                    });
+                    if (res.ok) success++;
+                    else failed++;
+                } catch (e) {
+                    failed++;
+                }
+                if (targets.length > 1) await sleep(800);
+            }
+
+            // 本地即时更新状态
+            const targetNumbers = new Set(targets.map(t => t.number));
+            allTodos.forEach(t => {
+                if (targetNumbers.has(t.number)) t.state = 'closed';
+            });
+            renderCalendar();
+            renderTodayBanner();
+
+            closeBulkDoneModal();
+            btn.textContent = '确认标记完成';
+            btn.disabled = false;
+            if (failed > 0) {
+                alert(`标记完成：成功 ${success} 个，失败 ${failed} 个。失败的任务请手动刷新后重试。`);
+            }
+        }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            loadConfig();
+            if (!isConfigured()) {
+                document.getElementById('config-notice').style.display = 'block';
+                document.getElementById('calendar-container').innerHTML = '<div class="loading">请点击右上角「配置」输入 GitHub 信息</div>';
+            } else {
+                loadAllTodos();
+            }
+        });
+    </script>
+</body>
+</html>
