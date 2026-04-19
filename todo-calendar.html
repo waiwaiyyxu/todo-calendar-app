@@ -1196,14 +1196,15 @@
         }
         async function doDeleteTask() {
             try {
+                const issueNumber = editingIssue.number;
                 const b = { ...editingIssue._body, deleted: true };
-                await fetch(`${API_URL()}/${editingIssue.number}`, {
+                await fetch(`${API_URL()}/${issueNumber}`, {
                     method: 'PATCH',
                     headers: headers(),
                     body: JSON.stringify({ state: 'closed', body: JSON.stringify(b) })
                 });
                 closeTaskModal();
-                allTodos = allTodos.filter(t => t.number !== editingIssue.number);
+                allTodos = allTodos.filter(t => t.number !== issueNumber);
                 renderCalendar();
                 renderTodayBanner();
             } catch (err) {
