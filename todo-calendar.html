@@ -431,8 +431,6 @@
         <h2 id="month-title">2026年4月</h2>
         <button class="secondary" onclick="changeMonth(1)">下月 ›</button>
     </div>
-    <div style="font-size:12px;color:#888;margin-bottom:8px;text-align:center" id="loaded-count"></div>
-
     <div id="calendar-container">
         <div class="loading">正在初始化...</div>
     </div>
@@ -850,11 +848,7 @@
                 renderCalendar();
                 renderTodayBanner();
 
-                // 界面只显示简洁计数
-                const countEl = document.getElementById('loaded-count');
-                if (countEl) countEl.textContent = `（已同步 ${allTodos.length} 个任务）`;
-
-                // 详细诊断信息放入调试面板
+                // 详细诊断信息放入调试面板（界面不显示计数，保持简洁）
                 let debugText = `加载方式: ${usedLabelFilter ? '按标签过滤' : '全部加载'}\n任务总数: ${allTodos.length}\n`;
                 if (allTodos.length === 0) {
                     debugText += '⚠️ 已同步 0 个任务。如果你刚保存了任务但看不到，请去 GitHub Issues 页面检查任务是否有 todo-calendar 标签\n';
