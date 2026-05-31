@@ -192,6 +192,15 @@
             font-size: 10px;
             color: #ff4d4f;
         }
+        .todo-card .todo-time {
+            flex-shrink: 0;
+            font-size: 10px;
+            color: #666;
+            background: #f0f0f0;
+            padding: 0 3px;
+            border-radius: 2px;
+            white-space: nowrap;
+        }
         .add-hint {
             font-size: 11px;
             color: #bbb;
@@ -471,6 +480,10 @@
                 <input type="date" id="task-date">
             </div>
             <div class="form-group">
+                <label>时间（可选）</label>
+                <input type="time" id="task-time">
+            </div>
+            <div class="form-group">
                 <label>任务内容</label>
                 <textarea id="task-text" placeholder="请输入待办事项..."></textarea>
             </div>
@@ -513,6 +526,7 @@
             <div class="modal-actions">
                 <button class="danger" id="btn-delete" style="display:none" onclick="deleteCurrentTask()">删除</button>
                 <button class="secondary" onclick="closeTaskModal()">取消</button>
+                <button class="secondary" id="btn-copy" style="display:none" onclick="copyTask()">复制</button>
                 <button onclick="saveTask()">保存</button>
             </div>
         </div>
@@ -529,6 +543,13 @@
             <div class="form-group">
                 <label>结束日期</label>
                 <input type="date" id="report-end">
+            </div>
+            <div class="form-group">
+                <label>排序方式</label>
+                <select id="report-sort">
+                    <option value="date">按日期排列</option>
+                    <option value="content">按内容分类</option>
+                </select>
             </div>
             <p style="font-size:12px;color:#888;margin-bottom:12px">默认已填入上周一至上周日，你可以手动修改后点击生成。</p>
             <div class="modal-actions" style="margin-bottom:12px">
@@ -553,6 +574,13 @@
             <div class="form-group">
                 <label>结束日期</label>
                 <input type="date" id="monthly-end">
+            </div>
+            <div class="form-group">
+                <label>排序方式</label>
+                <select id="monthly-sort">
+                    <option value="date">按日期排列</option>
+                    <option value="content">按内容分类</option>
+                </select>
             </div>
             <p style="font-size:12px;color:#888;margin-bottom:12px">默认已填入上月1日至上月最后一日，你可以手动修改后点击生成。</p>
             <div class="modal-actions" style="margin-bottom:12px">
@@ -916,6 +944,13 @@
                 dayTodos.sort((a, b) => {
                     if (a.state === 'open' && b.state === 'closed') return -1;
                     if (a.state === 'closed' && b.state === 'open') return 1;
+                    const hasTimeA = !!a._body.time;
+                    const hasTimeB = !!b._body.time;
+                    if (hasTimeA && !hasTimeB) return -1;
+                    if (!hasTimeA && hasTimeB) return 1;
+                    if (hasTimeA && hasTimeB && a._body.time !== b._body.time) {
+                        return a._body.time.localeCompare(b._body.time);
+                    }
                     return (b._body.priority || 1) - (a._body.priority || 1);
                 });
                 let todosHtml = '';
@@ -927,10 +962,12 @@
                     else if (t._body.tag === '生活') tagIcon = '<span class="tag-icon tag-life-icon">生</span>';
                     else if (t._body.tag === '其他') tagIcon = '<span class="tag-icon tag-other-icon">其</span>';
                     const bell = t._body.reminder ? '<span class="bell">🔔</span>' : '';
+                    const timeLabel = t._body.time ? `<span class="todo-time">${t._body.time}</span>` : '';
                     todosHtml += `
                         <div class="todo-card ${cls}" onclick="event.stopPropagation(); openEditModal(${t.number})">
                             ${tagIcon}
                             <span class="stars">${stars}</span>
+                            ${timeLabel}
                             <span class="text">${escapeHtml(t.title)}</span>
                             ${bell}
                         </div>
@@ -1084,6 +1121,7 @@
             editingIssue = null;
             document.getElementById('task-modal-title').textContent = '添加任务';
             document.getElementById('task-date').value = dateStr;
+            document.getElementById('task-time').value = '';
             document.getElementById('task-text').value = '';
             document.getElementById('task-tag').value = 'LP';
             document.getElementById('task-priority').value = '1';
@@ -1093,6 +1131,7 @@
             document.getElementById('task-done').checked = false;
             document.getElementById('done-row').style.display = 'none';
             document.getElementById('btn-delete').style.display = 'none';
+            document.getElementById('btn-copy').style.display = 'none';
             onTagChange();
             document.getElementById('task-overlay').classList.add('active');
             setTimeout(() => document.getElementById('task-text').focus(), 100);
@@ -1104,6 +1143,7 @@
             editingIssue = issue;
             document.getElementById('task-modal-title').textContent = '编辑任务';
             document.getElementById('task-date').value = issue._body.date || '';
+            document.getElementById('task-time').value = issue._body.time || '';
             document.getElementById('task-text').value = issue.title || '';
             document.getElementById('task-tag').value = issue._body.tag || 'LP';
             document.getElementById('task-priority').value = String(issue._body.priority || 1);
@@ -1113,6 +1153,7 @@
             document.getElementById('task-done').checked = issue.state === 'closed';
             document.getElementById('done-row').style.display = 'flex';
             document.getElementById('btn-delete').style.display = 'inline-block';
+            document.getElementById('btn-copy').style.display = 'inline-block';
             onTagChange();
             document.getElementById('task-overlay').classList.add('active');
         }
@@ -1122,8 +1163,28 @@
             editingIssue = null;
         }
 
+        function copyTask() {
+            const title = document.getElementById('task-text').value;
+            const tag = document.getElementById('task-tag').value;
+            const priority = document.getElementById('task-priority').value;
+            const category = document.getElementById('task-category').value;
+            const note = document.getElementById('task-note').value;
+
+            closeTaskModal();
+
+            openAddModal('');
+            document.getElementById('task-text').value = title;
+            document.getElementById('task-tag').value = tag;
+            onTagChange();
+            document.getElementById('task-priority').value = priority;
+            document.getElementById('task-category').value = category;
+            document.getElementById('task-note').value = note;
+            document.getElementById('task-modal-title').textContent = '复制任务';
+        }
+
         async function saveTask() {
             const date = document.getElementById('task-date').value;
+            const time = document.getElementById('task-time').value;
             const title = document.getElementById('task-text').value.trim();
             const tag = document.getElementById('task-tag').value;
             const priority = parseInt(document.getElementById('task-priority').value);
@@ -1135,6 +1196,7 @@
             if (!title) { alert('请输入任务内容'); return; }
 
             const bodyObj = { date, tag, priority, category, note };
+            if (time) bodyObj.time = time;
             if (reminder) bodyObj.reminder = reminder;
             const state = done ? 'closed' : 'open';
 
@@ -1207,6 +1269,41 @@
             }
         }
 
+        function sortByContent(tasks) {
+            const freq = {};
+            tasks.forEach(t => {
+                const title = t.title;
+                for (let i = 0; i < title.length - 1; i++) {
+                    const bg = title.substring(i, i + 2);
+                    if (/[\u4e00-\u9fa5]{2}/.test(bg)) {
+                        freq[bg] = (freq[bg] || 0) + 1;
+                    }
+                }
+            });
+            const keywords = Object.entries(freq)
+                .filter(([k, v]) => v >= 2)
+                .sort((a, b) => b[1] - a[1])
+                .map(([k]) => k);
+            tasks.forEach(t => {
+                t._sortKey = '';
+                for (const kw of keywords) {
+                    if (t.title.includes(kw)) {
+                        t._sortKey = kw;
+                        break;
+                    }
+                }
+            });
+            tasks.sort((a, b) => {
+                if (a._sortKey && b._sortKey) {
+                    return a._sortKey.localeCompare(b._sortKey);
+                }
+                if (a._sortKey && !b._sortKey) return -1;
+                if (!a._sortKey && b._sortKey) return 1;
+                return new Date(a._body.date) - new Date(b._body.date);
+            });
+            tasks.forEach(t => delete t._sortKey);
+        }
+
         // ========== 周报生成 ==========
         function getThisWeekRange() {
             const now = new Date();
@@ -1270,13 +1367,18 @@
             // 排除生活标签
             filteredTodos = filteredTodos.filter(t => t._body.tag !== '生活');
 
-            filteredTodos.sort((a, b) => {
-                const da = new Date(a._body.date), db = new Date(b._body.date);
-                if (da - db !== 0) return da - db;
-                if (a.state === 'open' && b.state === 'closed') return -1;
-                if (a.state === 'closed' && b.state === 'open') return 1;
-                return (b._body.priority || 1) - (a._body.priority || 1);
-            });
+            const reportSort = document.getElementById('report-sort').value;
+            if (reportSort === 'content') {
+                sortByContent(filteredTodos);
+            } else {
+                filteredTodos.sort((a, b) => {
+                    const da = new Date(a._body.date), db = new Date(b._body.date);
+                    if (da - db !== 0) return da - db;
+                    if (a.state === 'open' && b.state === 'closed') return -1;
+                    if (a.state === 'closed' && b.state === 'open') return 1;
+                    return (b._body.priority || 1) - (a._body.priority || 1);
+                });
+            }
 
             // 分离 LP相关/其他，同时分离填报标签
             const lpWithReport = filteredTodos.filter(t => t._body.category !== '其他' && t._body.tag === '填报');
@@ -1364,7 +1466,12 @@
                 return d >= start && d <= end;
             });
 
-            filtered.sort((a, b) => new Date(a._body.date) - new Date(b._body.date));
+            const monthlySort = document.getElementById('monthly-sort').value;
+            if (monthlySort === 'content') {
+                sortByContent(filtered);
+            } else {
+                filtered.sort((a, b) => new Date(a._body.date) - new Date(b._body.date));
+            }
 
             // 按用户要求分组（LP 按优先级拆为三档）
             const lpHigh = filtered.filter(t => t._body.tag === 'LP' && t._body.priority === 3);
