@@ -1246,7 +1246,11 @@
             const tag = document.getElementById('task-tag').value;
             const priority = parseInt(document.getElementById('task-priority').value);
             const category = tag === '生活' ? '生活' : document.getElementById('task-category').value;
-            const reminderVal = document.getElementById('task-reminder').value;
+            let reminderVal = document.getElementById('task-reminder').value;
+            // 如果没填提醒时间，但填了任务时间，自动用任务日期+时间作为提醒时间
+            if (!reminderVal && date && time) {
+                reminderVal = date + 'T' + time;
+            }
             const reminder = reminderVal ? new Date(reminderVal).toISOString() : '';
             const note = document.getElementById('task-note').value.trim();
 
