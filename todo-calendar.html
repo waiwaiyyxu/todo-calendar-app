@@ -201,6 +201,23 @@
             border-radius: 2px;
             white-space: nowrap;
         }
+        .advance-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 6px;
+            flex-wrap: wrap;
+        }
+        .advance-label {
+            font-size: 13px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+        }
+        .advance-label input[type="checkbox"] {
+            margin: 0;
+        }
         .add-hint {
             font-size: 11px;
             color: #bbb;
@@ -514,6 +531,23 @@
             <div class="form-group">
                 <label>提醒时间（可选）</label>
                 <input type="datetime-local" id="task-reminder">
+            </div>
+            <div class="form-group">
+                <label>提前提醒（可多选）</label>
+                <div class="advance-row">
+                    <label class="advance-label"><input type="checkbox" class="advance-check" value="15"> 15 分钟前</label>
+                    <label class="advance-label"><input type="checkbox" class="advance-check" value="30"> 30 分钟前</label>
+                </div>
+                <div class="advance-row">
+                    <label class="advance-label"><input type="checkbox" class="advance-check" value="60"> 1 小时前</label>
+                    <label class="advance-label"><input type="checkbox" class="advance-check" value="1440"> 1 天前</label>
+                </div>
+                <div class="advance-row">
+                    <label class="advance-label"><input type="checkbox" id="adv-custom-hour-check"> <input type="number" id="adv-custom-hour" min="1" style="width:45px;padding:2px 4px;border:1px solid #ddd;border-radius:3px;"> 小时前</label>
+                </div>
+                <div class="advance-row">
+                    <label class="advance-label"><input type="checkbox" id="adv-custom-day-check"> <input type="number" id="adv-custom-day" min="1" style="width:45px;padding:2px 4px;border:1px solid #ddd;border-radius:3px;"> 天前</label>
+                </div>
             </div>
             <div class="form-group">
                 <label>备注</label>
@@ -1127,6 +1161,11 @@
             document.getElementById('task-priority').value = '1';
             document.getElementById('task-category').value = 'LP相关';
             document.getElementById('task-reminder').value = '';
+            document.querySelectorAll('.advance-check').forEach(cb => cb.checked = false);
+            document.getElementById('adv-custom-hour-check').checked = false;
+            document.getElementById('adv-custom-hour').value = '';
+            document.getElementById('adv-custom-day-check').checked = false;
+            document.getElementById('adv-custom-day').value = '';
             document.getElementById('task-note').value = '';
             document.getElementById('task-done').checked = false;
             document.getElementById('done-row').style.display = 'none';
@@ -1149,6 +1188,24 @@
             document.getElementById('task-priority').value = String(issue._body.priority || 1);
             document.getElementById('task-category').value = issue._body.category || 'LP相关';
             document.getElementById('task-reminder').value = issue._body.reminder ? toDatetimeLocal(issue._body.reminder) : '';
+            // 填充提前提醒设置
+            const notices = issue._body.advanceNotices || [];
+            document.querySelectorAll('.advance-check').forEach(cb => {
+                cb.checked = notices.includes(parseInt(cb.value));
+            });
+            document.getElementById('adv-custom-hour-check').checked = false;
+            document.getElementById('adv-custom-hour').value = '';
+            document.getElementById('adv-custom-day-check').checked = false;
+            document.getElementById('adv-custom-day').value = '';
+            notices.forEach(n => {
+                if (n > 60 && n < 1440 && n % 60 === 0) {
+                    document.getElementById('adv-custom-hour-check').checked = true;
+                    document.getElementById('adv-custom-hour').value = n / 60;
+                } else if (n >= 1440 && n % 1440 === 0) {
+                    document.getElementById('adv-custom-day-check').checked = true;
+                    document.getElementById('adv-custom-day').value = n / 1440;
+                }
+            });
             document.getElementById('task-note').value = issue._body.note || '';
             document.getElementById('task-done').checked = issue.state === 'closed';
             document.getElementById('done-row').style.display = 'flex';
@@ -1192,11 +1249,26 @@
             const reminderVal = document.getElementById('task-reminder').value;
             const reminder = reminderVal ? new Date(reminderVal).toISOString() : '';
             const note = document.getElementById('task-note').value.trim();
+
+            // 读取提前提醒设置
+            const advanceNotices = [];
+            document.querySelectorAll('.advance-check:checked').forEach(cb => {
+                advanceNotices.push(parseInt(cb.value));
+            });
+            if (document.getElementById('adv-custom-hour-check').checked) {
+                const h = parseInt(document.getElementById('adv-custom-hour').value);
+                if (h > 0) advanceNotices.push(h * 60);
+            }
+            if (document.getElementById('adv-custom-day-check').checked) {
+                const d = parseInt(document.getElementById('adv-custom-day').value);
+                if (d > 0) advanceNotices.push(d * 1440);
+            }
             const done = document.getElementById('task-done').checked;
             if (!title) { alert('请输入任务内容'); return; }
 
             const bodyObj = { date, tag, priority, category, note };
             if (time) bodyObj.time = time;
+            if (advanceNotices.length > 0) bodyObj.advanceNotices = advanceNotices;
             if (reminder) bodyObj.reminder = reminder;
             const state = done ? 'closed' : 'open';
 
