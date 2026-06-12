@@ -67,6 +67,12 @@
             top: 80px;
             z-index: 90;
         }
+        body.has-today-banner .weekday {
+            top: 140px;
+        }
+        body.has-today-banner .day-cell {
+            scroll-margin-top: 170px;
+        }
         .today-banner h4 {
             font-size: 14px;
             color: #1677ff;
@@ -104,6 +110,10 @@
             color: #888;
             padding: 6px 0;
             font-weight: 600;
+            position: sticky;
+            top: 80px;
+            z-index: 80;
+            background: #f5f6f7;
         }
         .day-cell {
             background: #fff;
@@ -116,7 +126,7 @@
             flex-direction: column;
             cursor: pointer;
             transition: box-shadow 0.2s;
-            scroll-margin-top: 120px;
+            scroll-margin-top: 170px;
         }
         .day-cell:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
         .day-cell.other-month { background: #fafafa; color: #bbb; }
@@ -374,7 +384,7 @@
                 border-bottom: 1px solid #f0f0f0;
                 min-height: 60px;
                 cursor: pointer;
-                scroll-margin-top: 200px;
+                scroll-margin-top: 130px;
             }
             .list-day:last-child { border-bottom: none; }
             .list-day.today { background: #f0f7ff; }
@@ -429,8 +439,11 @@
             }
             .todo-card .stars, .todo-card .tag-icon, .todo-card .bell { font-size: 10px; }
             .today-banner {
-                top: 130px;
+                top: 150px;
                 margin-bottom: 10px;
+            }
+            body.has-today-banner .list-day {
+                scroll-margin-top: 220px;
             }
             .todo-card .todo-time {
                 font-size: 11px;
@@ -1063,7 +1076,11 @@
             const list = document.getElementById('today-list');
             const count = document.getElementById('today-count');
 
-            if (!todayTodos.length) { banner.style.display = 'none'; return; }
+            if (!todayTodos.length) {
+                banner.style.display = 'none';
+                document.body.classList.remove('has-today-banner');
+                return;
+            }
 
             todayTodos.sort((a, b) => (b._body.priority || 1) - (a._body.priority || 1));
             count.textContent = todayTodos.length;
@@ -1078,6 +1095,7 @@
                 return `<li><span class="badge ${badgeClass}">${badgeText}</span><span>${escapeHtml(t.title)}</span><span style="color:#ff9800;margin-left:4px">${stars}</span>${bell}</li>`;
             }).join('');
             banner.style.display = 'block';
+            document.body.classList.add('has-today-banner');
         }
 
         // ========== 日历渲染 ==========
