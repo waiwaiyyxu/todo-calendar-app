@@ -63,6 +63,9 @@
             border-radius: 8px;
             padding: 12px 16px;
             margin-bottom: 14px;
+            position: sticky;
+            top: 80px;
+            z-index: 90;
         }
         .today-banner h4 {
             font-size: 14px;
@@ -113,6 +116,7 @@
             flex-direction: column;
             cursor: pointer;
             transition: box-shadow 0.2s;
+            scroll-margin-top: 120px;
         }
         .day-cell:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
         .day-cell.other-month { background: #fafafa; color: #bbb; }
@@ -370,6 +374,7 @@
                 border-bottom: 1px solid #f0f0f0;
                 min-height: 60px;
                 cursor: pointer;
+                scroll-margin-top: 130px;
             }
             .list-day:last-child { border-bottom: none; }
             .list-day.today { background: #f0f7ff; }
@@ -1474,6 +1479,16 @@
         }
 
         function sortByContent(tasks) {
+            // 第一步：先按日期+时间排序（保持设立先后顺序）
+            tasks.sort((a, b) => {
+                const dateCompare = new Date(a._body.date) - new Date(b._body.date);
+                if (dateCompare !== 0) return dateCompare;
+                const timeA = a._body.time || '00:00';
+                const timeB = b._body.time || '00:00';
+                return timeA.localeCompare(timeB);
+            });
+
+            // 第二步：提取出现 2 次及以上的中文 2-gram 关键词
             const freq = {};
             tasks.forEach(t => {
                 const title = t.title;
@@ -1484,37 +1499,43 @@
                     }
                 }
             });
-            const keywords = Object.entries(freq)
-                .filter(([k, v]) => v >= 2)
-                .sort((a, b) => b[1] - a[1])
-                .map(([k]) => k);
+            const sharedKeywords = new Set(Object.keys(freq).filter(k => freq[k] >= 2));
+
+            function extractKeywords(title) {
+                const set = new Set();
+                for (let i = 0; i < title.length - 1; i++) {
+                    const bg = title.substring(i, i + 2);
+                    if (sharedKeywords.has(bg)) set.add(bg);
+                }
+                return set;
+            }
+
+            // 第三步：按首次出现顺序聚类
+            // 规则：如果当前任务与前面某个组的任务共享关键词，就归到那个组
+            const groups = [];
             tasks.forEach(t => {
-                t._sortKey = '';
-                for (const kw of keywords) {
-                    if (t.title.includes(kw)) {
-                        t._sortKey = kw;
-                        break;
+                const tKeywords = extractKeywords(t.title);
+                let matchedGroup = null;
+                for (const group of groups) {
+                    for (const kw of tKeywords) {
+                        if (group.keywords.has(kw)) {
+                            matchedGroup = group;
+                            break;
+                        }
                     }
+                    if (matchedGroup) break;
+                }
+                if (matchedGroup) {
+                    matchedGroup.tasks.push(t);
+                    tKeywords.forEach(kw => matchedGroup.keywords.add(kw));
+                } else {
+                    groups.push({ tasks: [t], keywords: new Set(tKeywords) });
                 }
             });
-            tasks.sort((a, b) => {
-                // 先按内容关键词分组
-                if (a._sortKey && b._sortKey) {
-                    const keyCompare = a._sortKey.localeCompare(b._sortKey);
-                    if (keyCompare !== 0) return keyCompare;
-                } else if (a._sortKey && !b._sortKey) {
-                    return -1;
-                } else if (!a._sortKey && b._sortKey) {
-                    return 1;
-                }
-                // 同一关键词组内按日期+时间排序
-                const dateCompare = new Date(a._body.date) - new Date(b._body.date);
-                if (dateCompare !== 0) return dateCompare;
-                const timeA = a._body.time || '00:00';
-                const timeB = b._body.time || '00:00';
-                return timeA.localeCompare(timeB);
-            });
-            tasks.forEach(t => delete t._sortKey);
+
+            // 第四步：按组顺序输出，组内保持时间顺序
+            tasks.length = 0;
+            groups.forEach(g => tasks.push(...g.tasks));
         }
 
         // ========== 周报生成 ==========
