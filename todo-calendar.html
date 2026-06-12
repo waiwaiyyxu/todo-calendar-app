@@ -22,6 +22,11 @@
             justify-content: space-between;
             gap: 12px;
             margin-bottom: 12px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: #f5f6f7;
+            padding: 12px 0;
         }
         .header h1 { font-size: 20px; color: #1a1a1a; }
         .header-controls {
@@ -48,10 +53,7 @@
             align-items: center;
             gap: 12px;
             margin-bottom: 12px;
-            position: sticky;
-            top: 0;
             background: #f5f6f7;
-            z-index: 50;
             padding: 8px 0;
         }
         .month-nav h2 { font-size: 18px; min-width: 140px; text-align: center; }
@@ -127,6 +129,17 @@
             color: #555;
         }
         .day-cell.today .day-number { color: #1677ff; }
+        .day-cell.holiday { background: #fff2f0; }
+        .holiday-badge {
+            font-size: 10px;
+            color: #cf1322;
+            background: #ffccc7;
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-weight: 600;
+            margin-right: auto;
+            margin-left: 4px;
+        }
         .day-count {
             font-size: 10px;
             color: #999;
@@ -380,6 +393,16 @@
                 margin-top: 2px;
             }
             .list-day.today .list-day-number { color: #1677ff; }
+            .list-day.holiday { background: #fff2f0; }
+            .list-holiday-badge {
+                font-size: 10px;
+                color: #cf1322;
+                background: #ffccc7;
+                padding: 1px 5px;
+                border-radius: 3px;
+                font-weight: 600;
+                margin-top: 2px;
+            }
             .list-day-todos {
                 flex: 1;
                 display: flex;
@@ -400,6 +423,14 @@
                 border-radius: 5px;
             }
             .todo-card .stars, .todo-card .tag-icon, .todo-card .bell { font-size: 10px; }
+            .todo-card .todo-time {
+                font-size: 11px;
+                padding: 1px 5px;
+                background: #e6f7ff;
+                color: #0050b3;
+                border-radius: 3px;
+                font-weight: 500;
+            }
             .today-banner { padding: 8px 10px; margin-bottom: 10px; }
             .today-banner h4 { font-size: 12px; margin-bottom: 6px; }
             .today-banner ul { font-size: 11px; }
@@ -809,6 +840,27 @@
             'Content-Type': 'application/json'
         });
 
+        // 中国法定节假日数据（来源：国务院办公厅公布）
+        // 每年国务院发布新安排后，需手动更新下一年数据
+        const HOLIDAYS = {
+            // 2025年
+            '2025-01-01': '元旦',
+            '2025-01-28': '春节', '2025-01-29': '春节', '2025-01-30': '春节', '2025-01-31': '春节',
+            '2025-02-01': '春节', '2025-02-02': '春节', '2025-02-03': '春节', '2025-02-04': '春节',
+            '2025-04-04': '清明', '2025-04-05': '清明', '2025-04-06': '清明',
+            '2025-05-01': '劳动节', '2025-05-02': '劳动节', '2025-05-03': '劳动节', '2025-05-04': '劳动节', '2025-05-05': '劳动节',
+            '2025-05-31': '端午', '2025-06-01': '端午', '2025-06-02': '端午',
+            '2025-10-01': '国庆', '2025-10-02': '国庆', '2025-10-03': '国庆', '2025-10-04': '国庆', '2025-10-05': '国庆', '2025-10-06': '国庆', '2025-10-07': '国庆', '2025-10-08': '国庆',
+            // 2026年
+            '2026-01-01': '元旦', '2026-01-02': '元旦', '2026-01-03': '元旦',
+            '2026-02-15': '春节', '2026-02-16': '春节', '2026-02-17': '春节', '2026-02-18': '春节', '2026-02-19': '春节', '2026-02-20': '春节', '2026-02-21': '春节', '2026-02-22': '春节', '2026-02-23': '春节',
+            '2026-04-04': '清明', '2026-04-05': '清明', '2026-04-06': '清明',
+            '2026-05-01': '劳动节', '2026-05-02': '劳动节', '2026-05-03': '劳动节', '2026-05-04': '劳动节', '2026-05-05': '劳动节',
+            '2026-06-19': '端午', '2026-06-20': '端午', '2026-06-21': '端午',
+            '2026-09-25': '中秋', '2026-09-26': '中秋', '2026-09-27': '中秋',
+            '2026-10-01': '国庆', '2026-10-02': '国庆', '2026-10-03': '国庆', '2026-10-04': '国庆', '2026-10-05': '国庆', '2026-10-06': '国庆', '2026-10-07': '国庆'
+        };
+
         let currentYear = new Date().getFullYear();
         let currentMonth = new Date().getMonth();
         let allTodos = [];
@@ -816,6 +868,8 @@
         let statData = [];
         let isLoadingTodos = false;
         let lastDebugInfo = '';
+        let hasScrolledToToday = false;
+        let dynamicHolidays = {}; // 从 API 动态加载的假期数据
 
         function formatDate(d) {
             const yyyy = d.getFullYear();
@@ -844,6 +898,63 @@
         }
 
         function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+        // ========== 假期数据加载 ==========
+        async function loadHolidays(year) {
+            if (dynamicHolidays[year]) return;
+
+            const cacheKey = `todo_holidays_${year}`;
+            const halfYearMs = 180 * 24 * 60 * 60 * 1000; // 180 天
+
+            // 先读 localStorage 缓存
+            const cached = localStorage.getItem(cacheKey);
+            if (cached) {
+                try {
+                    const { data, timestamp } = JSON.parse(cached);
+                    if (Date.now() - timestamp < halfYearMs) {
+                        dynamicHolidays[year] = data;
+                        console.log(`[假期] 使用缓存 ${year} 年假期数据`);
+                        return;
+                    }
+                } catch (e) {
+                    console.error('解析假期缓存失败:', e);
+                }
+            }
+
+            // 缓存不存在或过期，调用 API
+            try {
+                const res = await fetch(`https://timor.tech/api/holiday/year/${year}`, { cache: 'no-store' });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                if (data.code !== 0) throw new Error(data.msg || 'API error');
+                const holidays = {};
+                Object.values(data.holiday).forEach(h => {
+                    if (h.holiday && h.date) {
+                        holidays[h.date] = h.name;
+                    }
+                });
+                dynamicHolidays[year] = holidays;
+                localStorage.setItem(cacheKey, JSON.stringify({ data: holidays, timestamp: Date.now() }));
+                console.log(`[假期] 已加载 ${year} 年假期数据`);
+            } catch (e) {
+                console.error(`[假期] 加载 ${year} 年失败:`, e);
+                // API 失败时，优先使用过期缓存
+                if (cached) {
+                    try {
+                        const { data } = JSON.parse(cached);
+                        dynamicHolidays[year] = data;
+                        console.log(`[假期] API 失败，使用过期缓存 ${year}`);
+                        return;
+                    } catch (e2) {}
+                }
+                dynamicHolidays[year] = {}; // 失败时为空，fallback 到静态数据
+            }
+        }
+
+        function getHolidayName(dateStr) {
+            const [year] = dateStr.split('-');
+            return (dynamicHolidays[year] && dynamicHolidays[year][dateStr]) || HOLIDAYS[dateStr] || null;
+        }
 
         // ========== 数据加载 ==========
         async function fetchIssues(useLabelFilter) {
@@ -907,6 +1018,7 @@
 
                 allTodos = issues.map(i => ({ ...i, _body: parseBody(i) })).filter(t => !t._body.deleted);
 
+                await loadHolidays(currentYear);
                 renderCalendar();
                 renderTodayBanner();
 
@@ -1029,12 +1141,14 @@
             for (let d = 1; d <= daysInMonth; d++) {
                 const dateStr = formatDate(new Date(currentYear, currentMonth, d));
                 const isToday = dateStr === todayStr;
+                const holiday = getHolidayName(dateStr);
                 const { todosHtml, dayTodos } = getDayTodosHtml(dateStr);
 
                 gridHtml += `
-                    <div class="day-cell ${isToday ? 'today' : ''}" onclick="openAddModal('${dateStr}')">
+                    <div class="day-cell ${isToday ? 'today' : ''} ${holiday ? 'holiday' : ''}" onclick="openAddModal('${dateStr}')">
                         <div class="day-header">
                             <span class="day-number">${d}</span>
+                            ${holiday ? `<span class="holiday-badge">${holiday}</span>` : ''}
                             ${dayTodos.length > 0 ? `<span class="day-count">${dayTodos.filter(t=>t.state==='open').length}/${dayTodos.length}</span>` : ''}
                         </div>
                         <div class="todos-container">
@@ -1072,13 +1186,15 @@
             for (let d = 1; d <= daysInMonth; d++) {
                 const dateStr = formatDate(new Date(currentYear, currentMonth, d));
                 const isToday = dateStr === todayStr;
+                const holiday = getHolidayName(dateStr);
                 const { todosHtml, dayTodos } = getDayTodosHtml(dateStr);
 
                 listHtml += `
-                    <div class="list-day ${isToday ? 'today' : ''}" onclick="openAddModal('${dateStr}')">
+                    <div class="list-day ${isToday ? 'today' : ''} ${holiday ? 'holiday' : ''}" onclick="openAddModal('${dateStr}')" data-date="${dateStr}">
                         <div class="list-day-header">
                             <span class="list-day-number">${d}</span>
                             <span class="list-day-weekday">${weekdays[new Date(currentYear, currentMonth, d).getDay()]}</span>
+                            ${holiday ? `<span class="list-holiday-badge">${holiday}</span>` : ''}
                         </div>
                         <div class="list-day-todos">
                             ${todosHtml || '<span class="list-day-empty">+ 添加</span>'}
@@ -1106,16 +1222,28 @@
                 <div class="calendar-list">${listHtml}</div>
             `;
 
+            // 首次加载时滚动到今天
+            if (!hasScrolledToToday) {
+                const todayEl = document.querySelector('.list-day.today') || document.querySelector('.day-cell.today');
+                if (todayEl) {
+                    setTimeout(() => {
+                        todayEl.scrollIntoView({ behavior: 'auto', block: 'start' });
+                        hasScrolledToToday = true;
+                    }, 100);
+                }
+            }
+
             // 渲染诊断
             const checkDate = '2026-04-18';
             const found = allTodos.filter(t => t._body.date === checkDate);
             console.log(`[渲染诊断] 当前显示: ${currentYear}年${currentMonth+1}月 | ${checkDate}有${found.length}个任务`);
         }
 
-        function changeMonth(delta) {
+        async function changeMonth(delta) {
             currentMonth += delta;
             if (currentMonth > 11) { currentMonth = 0; currentYear++; }
             if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+            await loadHolidays(currentYear);
             renderCalendar();
             renderTodayBanner();
         }
@@ -1370,12 +1498,21 @@
                 }
             });
             tasks.sort((a, b) => {
+                // 先按内容关键词分组
                 if (a._sortKey && b._sortKey) {
-                    return a._sortKey.localeCompare(b._sortKey);
+                    const keyCompare = a._sortKey.localeCompare(b._sortKey);
+                    if (keyCompare !== 0) return keyCompare;
+                } else if (a._sortKey && !b._sortKey) {
+                    return -1;
+                } else if (!a._sortKey && b._sortKey) {
+                    return 1;
                 }
-                if (a._sortKey && !b._sortKey) return -1;
-                if (!a._sortKey && b._sortKey) return 1;
-                return new Date(a._body.date) - new Date(b._body.date);
+                // 同一关键词组内按日期+时间排序
+                const dateCompare = new Date(a._body.date) - new Date(b._body.date);
+                if (dateCompare !== 0) return dateCompare;
+                const timeA = a._body.time || '00:00';
+                const timeB = b._body.time || '00:00';
+                return timeA.localeCompare(timeB);
             });
             tasks.forEach(t => delete t._sortKey);
         }
