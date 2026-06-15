@@ -151,6 +151,15 @@
         }
         .day-cell:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
         .day-cell.other-month { background: #fafafa; color: #bbb; }
+        .day-cell.other-month.empty {
+            background: transparent;
+            border-color: transparent;
+            pointer-events: none;
+        }
+        .day-cell.other-month.empty .day-header,
+        .day-cell.other-month.empty .todos-container {
+            display: none;
+        }
         .day-cell.today { border-color: #1677ff; background: #f0f7ff; }
         .day-header {
             display: flex;
@@ -1183,8 +1192,7 @@
             let gridHtml = '';
 
             for (let i = startWeekday - 1; i >= 0; i--) {
-                const d = prevMonthDays - i;
-                gridHtml += `<div class="day-cell other-month"><div class="day-header"><span class="day-number">${d}</span></div></div>`;
+                gridHtml += `<div class="day-cell other-month empty"><div class="day-header"></div><div class="todos-container"></div></div>`;
             }
 
             for (let d = 1; d <= daysInMonth; d++) {
@@ -1210,7 +1218,7 @@
 
             const remaining = (7 - ((startWeekday + daysInMonth) % 7)) % 7;
             for (let d = 1; d <= remaining; d++) {
-                gridHtml += `<div class="day-cell other-month"><div class="day-header"><span class="day-number">${d}</span></div></div>`;
+                gridHtml += `<div class="day-cell other-month empty"><div class="day-header"></div><div class="todos-container"></div></div>`;
             }
 
             // ========== 手机列表视图 ==========
