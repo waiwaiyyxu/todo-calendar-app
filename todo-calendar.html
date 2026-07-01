@@ -126,15 +126,6 @@
         }
         .day-cell:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
         .day-cell.other-month { background: #fafafa; color: #bbb; }
-        .day-cell.other-month.empty {
-            background: transparent;
-            border-color: transparent;
-            pointer-events: none;
-        }
-        .day-cell.other-month.empty .day-header,
-        .day-cell.other-month.empty .todos-container {
-            display: none;
-        }
         .day-cell.today { border-color: #1677ff; background: #f0f7ff; }
         .day-header {
             display: flex;
@@ -1163,7 +1154,24 @@
             let gridHtml = '';
 
             for (let i = startWeekday - 1; i >= 0; i--) {
-                gridHtml += `<div class="day-cell other-month empty"><div class="day-header"></div><div class="todos-container"></div></div>`;
+                const d = prevMonthDays - i;
+                const dateStr = formatDate(new Date(currentYear, currentMonth - 1, d));
+                const isToday = dateStr === todayStr;
+                const holiday = getHolidayName(dateStr);
+                const { todosHtml, dayTodos } = getDayTodosHtml(dateStr);
+                gridHtml += `
+                    <div class="day-cell other-month ${isToday ? 'today' : ''} ${holiday ? 'holiday' : ''}" onclick="openAddModal('${dateStr}')">
+                        <div class="day-header">
+                            <span class="day-number">${d}</span>
+                            ${holiday ? `<span class="holiday-badge">${holiday}</span>` : ''}
+                            ${dayTodos.length > 0 ? `<span class="day-count">${dayTodos.filter(t=>t.state==='open').length}/${dayTodos.length}</span>` : ''}
+                        </div>
+                        <div class="todos-container">
+                            ${todosHtml}
+                            ${dayTodos.length === 0 ? '<div class="add-hint">+ 添加</div>' : ''}
+                        </div>
+                    </div>
+                `;
             }
 
             for (let d = 1; d <= daysInMonth; d++) {
@@ -1189,7 +1197,23 @@
 
             const remaining = (7 - ((startWeekday + daysInMonth) % 7)) % 7;
             for (let d = 1; d <= remaining; d++) {
-                gridHtml += `<div class="day-cell other-month empty"><div class="day-header"></div><div class="todos-container"></div></div>`;
+                const dateStr = formatDate(new Date(currentYear, currentMonth + 1, d));
+                const isToday = dateStr === todayStr;
+                const holiday = getHolidayName(dateStr);
+                const { todosHtml, dayTodos } = getDayTodosHtml(dateStr);
+                gridHtml += `
+                    <div class="day-cell other-month ${isToday ? 'today' : ''} ${holiday ? 'holiday' : ''}" onclick="openAddModal('${dateStr}')">
+                        <div class="day-header">
+                            <span class="day-number">${d}</span>
+                            ${holiday ? `<span class="holiday-badge">${holiday}</span>` : ''}
+                            ${dayTodos.length > 0 ? `<span class="day-count">${dayTodos.filter(t=>t.state==='open').length}/${dayTodos.length}</span>` : ''}
+                        </div>
+                        <div class="todos-container">
+                            ${todosHtml}
+                            ${dayTodos.length === 0 ? '<div class="add-hint">+ 添加</div>' : ''}
+                        </div>
+                    </div>
+                `;
             }
 
             // ========== 手机列表视图 ==========
@@ -1199,13 +1223,19 @@
             for (let i = startWeekday - 1; i >= 0; i--) {
                 const d = prevMonthDays - i;
                 const dateStr = formatDate(new Date(currentYear, currentMonth - 1, d));
+                const isToday = dateStr === todayStr;
+                const holiday = getHolidayName(dateStr);
+                const { todosHtml, dayTodos } = getDayTodosHtml(dateStr);
                 listHtml += `
-                    <div class="list-day other-month" onclick="openAddModal('${dateStr}')">
+                    <div class="list-day other-month ${isToday ? 'today' : ''} ${holiday ? 'holiday' : ''}" onclick="openAddModal('${dateStr}')" data-date="${dateStr}">
                         <div class="list-day-header">
                             <span class="list-day-number">${d}</span>
-                            <span class="list-day-weekday">${weekdays[(startWeekday - 1 - i + 7) % 7]}</span>
+                            <span class="list-day-weekday">${weekdays[new Date(currentYear, currentMonth - 1, d).getDay()]}</span>
+                            ${holiday ? `<span class="list-holiday-badge">${holiday}</span>` : ''}
                         </div>
-                        <div class="list-day-todos"><span class="list-day-empty">+ 添加</span></div>
+                        <div class="list-day-todos">
+                            ${todosHtml || '<span class="list-day-empty">+ 添加</span>'}
+                        </div>
                     </div>
                 `;
             }
@@ -1234,13 +1264,19 @@
             // 下月的开头
             for (let d = 1; d <= remaining; d++) {
                 const dateStr = formatDate(new Date(currentYear, currentMonth + 1, d));
+                const isToday = dateStr === todayStr;
+                const holiday = getHolidayName(dateStr);
+                const { todosHtml, dayTodos } = getDayTodosHtml(dateStr);
                 listHtml += `
-                    <div class="list-day other-month" onclick="openAddModal('${dateStr}')">
+                    <div class="list-day other-month ${isToday ? 'today' : ''} ${holiday ? 'holiday' : ''}" onclick="openAddModal('${dateStr}')" data-date="${dateStr}">
                         <div class="list-day-header">
                             <span class="list-day-number">${d}</span>
-                            <span class="list-day-weekday">${weekdays[(startWeekday + daysInMonth + d - 1) % 7]}</span>
+                            <span class="list-day-weekday">${weekdays[new Date(currentYear, currentMonth + 1, d).getDay()]}</span>
+                            ${holiday ? `<span class="list-holiday-badge">${holiday}</span>` : ''}
                         </div>
-                        <div class="list-day-todos"><span class="list-day-empty">+ 添加</span></div>
+                        <div class="list-day-todos">
+                            ${todosHtml || '<span class="list-day-empty">+ 添加</span>'}
+                        </div>
                     </div>
                 `;
             }
