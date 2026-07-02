@@ -88,6 +88,14 @@
             border-radius: 3px;
             font-weight: 600;
         }
+        .today-banner .todo-time {
+            flex-shrink: 0;
+            font-size: 10px;
+            color: #666;
+            background: #f0f0f0;
+            padding: 0 3px;
+            border-radius: 2px;
+        }
         .badge-lp { background: #e6f7ff; color: #0050b3; }
         .badge-report { background: #fff2e8; color: #ad4e00; }
         .badge-life { background: #f6ffed; color: #389e0d; }
@@ -445,6 +453,14 @@
             .today-banner { padding: 8px 10px; margin-bottom: 10px; }
             .today-banner h4 { font-size: 12px; margin-bottom: 6px; }
             .today-banner ul { font-size: 11px; }
+            .today-banner .todo-time {
+                font-size: 11px;
+                padding: 1px 5px;
+                background: #e6f7ff;
+                color: #0050b3;
+                border-radius: 3px;
+                font-weight: 500;
+            }
             .month-nav { gap: 8px; margin-bottom: 8px; }
             .month-nav h2 { font-size: 15px; min-width: 110px; }
             .overlay { padding: 8px; }
@@ -1075,7 +1091,16 @@
                 return;
             }
 
-            todayTodos.sort((a, b) => (b._body.priority || 1) - (a._body.priority || 1));
+            todayTodos.sort((a, b) => {
+                const hasTimeA = !!a._body.time;
+                const hasTimeB = !!b._body.time;
+                if (hasTimeA && !hasTimeB) return -1;
+                if (!hasTimeA && hasTimeB) return 1;
+                if (hasTimeA && hasTimeB && a._body.time !== b._body.time) {
+                    return a._body.time.localeCompare(b._body.time);
+                }
+                return (b._body.priority || 1) - (a._body.priority || 1);
+            });
             count.textContent = todayTodos.length;
             list.innerHTML = todayTodos.map(t => {
                 const stars = '★'.repeat(t._body.priority || 1);
@@ -1085,7 +1110,8 @@
                 else if (t._body.tag === '生活') { badgeClass = 'badge-life'; badgeText = '生活'; }
                 else if (t._body.tag === '其他') { badgeClass = 'badge-other'; badgeText = '其他'; }
                 const bell = t._body.reminder ? '<span class="bell">🔔</span>' : '';
-                return `<li><span class="badge ${badgeClass}">${badgeText}</span><span>${escapeHtml(t.title)}</span><span style="color:#ff9800;margin-left:4px">${stars}</span>${bell}</li>`;
+                const timeLabel = t._body.time ? `<span class="todo-time">${t._body.time}</span>` : '';
+                return `<li><span class="badge ${badgeClass}">${badgeText}</span>${timeLabel}<span>${escapeHtml(t.title)}</span><span style="color:#ff9800;margin-left:4px">${stars}</span>${bell}</li>`;
             }).join('');
             banner.style.display = 'block';
         }
