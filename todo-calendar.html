@@ -288,6 +288,7 @@
         .form-group input[type="text"],
         .form-group input[type="password"],
         .form-group input[type="datetime-local"],
+        .form-group input[type="time"],
         .form-group textarea,
         .form-group select {
             width: 100%;
@@ -298,6 +299,24 @@
             font-family: inherit;
         }
         .form-group textarea { min-height: 80px; resize: vertical; }
+        .time-range-inputs {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .time-range-inputs input[type="time"] {
+            flex: 1;
+        }
+        .time-range-sep {
+            color: #999;
+            font-size: 14px;
+        }
+        .form-hint {
+            display: block;
+            font-size: 11px;
+            color: #999;
+            margin-top: 4px;
+        }
         .form-group input[type="checkbox"] {
             width: 18px; height: 18px; cursor: pointer;
         }
@@ -559,9 +578,14 @@
                 <label>日期</label>
                 <input type="date" id="task-date">
             </div>
-            <div class="form-group">
+            <div class="form-group time-range-group">
                 <label>时间（可选）</label>
-                <input type="time" id="task-time">
+                <div class="time-range-inputs">
+                    <input type="time" id="task-time" placeholder="开始">
+                    <span class="time-range-sep">-</span>
+                    <input type="time" id="task-end-time" placeholder="结束">
+                </div>
+                <small class="form-hint">填写结束时间可记录活动时长，保存时会检查时间冲突</small>
             </div>
             <div class="form-group">
                 <label>任务内容</label>
@@ -1110,7 +1134,8 @@
                 else if (t._body.tag === '生活') { badgeClass = 'badge-life'; badgeText = '生活'; }
                 else if (t._body.tag === '其他') { badgeClass = 'badge-other'; badgeText = '其他'; }
                 const bell = t._body.reminder ? '<span class="bell">🔔</span>' : '';
-                const timeLabel = t._body.time ? `<span class="todo-time">${t._body.time}</span>` : '';
+                const timeText = formatTimeRange(t);
+                const timeLabel = timeText ? `<span class="todo-time">${timeText}</span>` : '';
                 return `<li><span class="badge ${badgeClass}">${badgeText}</span>${timeLabel}<span>${escapeHtml(t.title)}</span><span style="color:#ff9800;margin-left:4px">${stars}</span>${bell}</li>`;
             }).join('');
             banner.style.display = 'block';
@@ -1153,7 +1178,8 @@
                     else if (t._body.tag === '生活') tagIcon = '<span class="tag-icon tag-life-icon">生</span>';
                     else if (t._body.tag === '其他') tagIcon = '<span class="tag-icon tag-other-icon">其</span>';
                     const bell = t._body.reminder ? '<span class="bell">🔔</span>' : '';
-                    const timeLabel = t._body.time ? `<span class="todo-time">${t._body.time}</span>` : '';
+                    const timeText = formatTimeRange(t);
+                    const timeLabel = timeText ? `<span class="todo-time">${timeText}</span>` : '';
                     todosHtml += `
                         <div class="todo-card ${cls}" onclick="event.stopPropagation(); openEditModal(${t.number})">
                             ${tagIcon}
@@ -1358,6 +1384,34 @@
             return div.innerHTML;
         }
 
+        function timeToMinutes(t) {
+            if (!t) return null;
+            const [h, m] = t.split(':').map(Number);
+            return h * 60 + m;
+        }
+
+        function formatTimeRange(t) {
+            if (!t._body.time) return '';
+            if (t._body.endTime) return `${t._body.time}-${t._body.endTime}`;
+            return t._body.time;
+        }
+
+        function hasTimeConflict(date, time, endTime, excludeIssueNumber) {
+            if (!time || !endTime) return false;
+            const start = timeToMinutes(time);
+            const end = timeToMinutes(endTime);
+            if (start === null || end === null || end <= start) return false;
+            return allTodos.some(t => {
+                if (t.state !== 'open') return false;
+                if (t._body.date !== date) return false;
+                if (excludeIssueNumber && t.number === excludeIssueNumber) return false;
+                if (!t._body.time) return false;
+                const otherStart = timeToMinutes(t._body.time);
+                const otherEnd = t._body.endTime ? timeToMinutes(t._body.endTime) : otherStart + 60;
+                return start < otherEnd && otherStart < end;
+            });
+        }
+
         // ========== 弹窗控制 ==========
         function onTagChange() {
             const tag = document.getElementById('task-tag').value;
@@ -1377,6 +1431,7 @@
             document.getElementById('task-modal-title').textContent = '添加任务';
             document.getElementById('task-date').value = dateStr;
             document.getElementById('task-time').value = '';
+            document.getElementById('task-end-time').value = '';
             document.getElementById('task-text').value = '';
             document.getElementById('task-tag').value = 'LP';
             document.getElementById('task-priority').value = '1';
@@ -1404,6 +1459,7 @@
             document.getElementById('task-modal-title').textContent = '编辑任务';
             document.getElementById('task-date').value = issue._body.date || '';
             document.getElementById('task-time').value = issue._body.time || '';
+            document.getElementById('task-end-time').value = issue._body.endTime || '';
             document.getElementById('task-text').value = issue.title || '';
             document.getElementById('task-tag').value = issue._body.tag || 'LP';
             document.getElementById('task-priority').value = String(issue._body.priority || 1);
@@ -1447,6 +1503,8 @@
             const priority = document.getElementById('task-priority').value;
             const category = document.getElementById('task-category').value;
             const note = document.getElementById('task-note').value;
+            const time = document.getElementById('task-time').value;
+            const endTime = document.getElementById('task-end-time').value;
 
             closeTaskModal();
 
@@ -1457,12 +1515,15 @@
             document.getElementById('task-priority').value = priority;
             document.getElementById('task-category').value = category;
             document.getElementById('task-note').value = note;
+            document.getElementById('task-time').value = time;
+            document.getElementById('task-end-time').value = endTime;
             document.getElementById('task-modal-title').textContent = '复制任务';
         }
 
         async function saveTask() {
             const date = document.getElementById('task-date').value;
             const time = document.getElementById('task-time').value;
+            const endTime = document.getElementById('task-end-time').value;
             const title = document.getElementById('task-text').value.trim();
             const tag = document.getElementById('task-tag').value;
             const priority = parseInt(document.getElementById('task-priority').value);
@@ -1490,9 +1551,24 @@
             }
             const done = document.getElementById('task-done').checked;
             if (!title) { alert('请输入任务内容'); return; }
+            if (endTime && !time) {
+                alert('填写结束时间需要先填写开始时间');
+                return;
+            }
+            if (time && endTime) {
+                if (timeToMinutes(endTime) <= timeToMinutes(time)) {
+                    alert('结束时间必须晚于开始时间');
+                    return;
+                }
+                const conflict = hasTimeConflict(date, time, endTime, editingIssue?.number);
+                if (conflict) {
+                    if (!confirm('该时间段与已有任务存在冲突，是否继续保存？')) return;
+                }
+            }
 
             const bodyObj = { date, tag, priority, category, note };
             if (time) bodyObj.time = time;
+            if (endTime) bodyObj.endTime = endTime;
             if (advanceNotices.length > 0) bodyObj.advanceNotices = advanceNotices;
             if (reminder) bodyObj.reminder = reminder;
             const state = done ? 'closed' : 'open';
