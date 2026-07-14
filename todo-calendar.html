@@ -184,14 +184,18 @@
             font-size: 12px;
             line-height: 1.35;
             display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            gap: 4px;
+            flex-direction: column;
+            gap: 2px;
             cursor: pointer;
             word-break: break-word;
         }
+        .todo-card .todo-meta {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
         .todo-card .text {
-            width: 100%;
+            display: block;
         }
         .todo-card.open {
             background: #fff3cd;
@@ -1186,11 +1190,13 @@
                     const timeLabel = timeText ? `<span class="todo-time">${timeText}</span>` : '';
                     todosHtml += `
                         <div class="todo-card ${cls}" onclick="event.stopPropagation(); openEditModal(${t.number})">
-                            ${tagIcon}
-                            <span class="stars">${stars}</span>
-                            ${timeLabel}
+                            <div class="todo-meta">
+                                ${tagIcon}
+                                <span class="stars">${stars}</span>
+                                ${timeLabel}
+                                ${bell}
+                            </div>
                             <span class="text">${escapeHtml(t.title)}</span>
-                            ${bell}
                         </div>
                     `;
                 });
@@ -1468,7 +1474,13 @@
             document.getElementById('task-tag').value = issue._body.tag || 'LP';
             document.getElementById('task-priority').value = String(issue._body.priority || 1);
             document.getElementById('task-category').value = issue._body.category || 'LP相关';
-            document.getElementById('task-reminder').value = issue._body.reminder ? toDatetimeLocal(issue._body.reminder) : '';
+            // 如果 reminder 是系统自动根据任务日期+时间生成的，编辑时不显示在输入框里，
+            // 这样用户修改任务时间后，提醒时间会自动跟随更新
+            const autoReminder = issue._body.date && issue._body.time
+                ? new Date(issue._body.date + 'T' + issue._body.time).toISOString()
+                : '';
+            const isAutoReminder = issue._body.reminder && issue._body.reminder === autoReminder;
+            document.getElementById('task-reminder').value = (issue._body.reminder && !isAutoReminder) ? toDatetimeLocal(issue._body.reminder) : '';
             // 填充提前提醒设置
             const notices = issue._body.advanceNotices || [];
             document.querySelectorAll('.advance-check').forEach(cb => {
